@@ -1,0 +1,59 @@
+[package]
+name = "alice-view"
+version = "0.1.0"
+edition = "2021"
+authors = ["Moroya Sakamoto"]
+description = "The Infinite Canvas - Real-time procedural rendering engine for ALICE ecosystem"
+license = "MIT"
+repository = "https://github.com/ext-sakamoro/ALICE-View"
+keywords = ["visualization", "procedural", "wgpu", "alice", "compression"]
+categories = ["graphics", "visualization", "multimedia"]
+
+[dependencies]
+# Performance
+mimalloc = "0.1"
+
+# Graphics
+wgpu = "0.19"
+winit = "0.29"
+pollster = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
+
+# GUI
+egui = "0.27"
+egui-wgpu = "0.27"
+egui-winit = "0.27"
+
+# Math & Procedural (SIMD optimized)
+glam = { version = "0.25", features = ["bytemuck", "serde"] }
+noise = "0.9"
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+image = "0.24"
+rfd = "0.14"
+
+# Async
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[lib]
+name = "alice_view"
+path = "src/lib.rs"
+
+[[bin]]
+name = "alice-view"
+path = "src/main.rs"
+
+[[bin]]
+name = "alice-create"
+path = "src/bin/alice-create.rs"

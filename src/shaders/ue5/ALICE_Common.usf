@@ -1,0 +1,210 @@
+// ALICE Common Functions for Unreal Engine 5
+// "Store equations, not pixels" - GPU-computed infinite resolution
+//
+// Usage: Include this file in your Custom Material Expression or Material Function
+// #include "/Project/ALICE/ALICE_Common.usf"
+
+#pragma once
+
+// ============================================
+// Hash Functions
+// ============================================
+
+float ALICE_Hash2(float2 p)
+{
+    return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+}
+
+float ALICE_Hash3(float3 p)
+{
+    return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+float2 ALICE_Hash2D(float2 p)
+{
+    return float2(
+        ALICE_Hash2(p),
+        ALICE_Hash2(p + float2(57.0, 113.0))
+    );
+}
+
+// ============================================
+// Noise Functions
+// ============================================
+
+float ALICE_GradientNoise(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+
+    // Quintic interpolation for smoother results
+    float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+
+    float a = ALICE_Hash2(i + float2(0.0, 0.0));
+    float b = ALICE_Hash2(i + float2(1.0, 0.0));
+    float c = ALICE_Hash2(i + float2(0.0, 1.0));
+    float d = ALICE_Hash2(i + float2(1.0, 1.0));
+
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+float ALICE_ValueNoise(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+
+    float2 u = f * f * (3.0 - 2.0 * f);
+
+    return lerp(
+        lerp(ALICE_Hash2(i + float2(0.0, 0.0)), ALICE_Hash2(i + float2(1.0, 0.0)), u.x),
+        lerp(ALICE_Hash2(i + float2(0.0, 1.0)), ALICE_Hash2(i + float2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+// ============================================
+// Fractal Brownian Motion (FBM)
+// ============================================
+
+float ALICE_FBM(float2 p, int Octaves, float Persistence, float Lacunarity)
+{
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    float maxValue = 0.0;
+
+    for (int i = 0; i < Octaves; i++)
+    {
+        value += amplitude * ALICE_GradientNoise(p * frequency);
+        maxValue += amplitude;
+        amplitude *= Persistence;
+        frequency *= Lacunarity;
+    }
+
+    return value / maxValue;
+}
+
+// Simplified FBM with default parameters
+float ALICE_FBM_Simple(float2 p, int Octaves)
+{
+    return ALICE_FBM(p, Octaves, 0.5, 2.0);
+}
+
+// ============================================
+// Voronoi / Cellular Noise
+// ============================================
+
+struct ALICE_VoronoiResult
+{
+    float Distance;
+    float2 CellCenter;
+    float CellID;
+};
+
+ALICE_VoronoiResult ALICE_Voronoi(float2 p, float Randomness)
+{
+    float2 n = floor(p);
+    float2 f = frac(p);
+
+    ALICE_VoronoiResult result;
+    result.Distance = 10.0;
+    result.CellCenter = float2(0.0, 0.0);
+    result.CellID = 0.0;
+
+    for (int j = -1; j <= 1; j++)
+    {
+        for (int i = -1; i <= 1; i++)
+        {
+            float2 neighbor = float2(float(i), float(j));
+            float2 point = ALICE_Hash2D(n + neighbor) * Randomness;
+            float2 diff = neighbor + point - f;
+            float dist = length(diff);
+
+            if (dist < result.Distance)
+            {
+                result.Distance = dist;
+                result.CellCenter = n + neighbor + point;
+                result.CellID = ALICE_Hash2(n + neighbor);
+            }
+        }
+    }
+
+    return result;
+}
+
+// ============================================
+// Fractal Functions
+// ============================================
+
+// Mandelbrot set iteration
+float ALICE_Mandelbrot(float2 c, int MaxIterations, float EscapeRadius)
+{
+    float2 z = float2(0.0, 0.0);
+    int i = 0;
+    float escape2 = EscapeRadius * EscapeRadius;
+
+    for (int iter = 0; iter < 256; iter++)
+    {
+        if (iter >= MaxIterations) break;
+        if (dot(z, z) > escape2) break;
+
+        z = float2(
+            z.x * z.x - z.y * z.y + c.x,
+            2.0 * z.x * z.y + c.y
+        );
+        i++;
+    }
+
+    if (i >= MaxIterations) return 0.0;
+
+    // Smooth coloring
+    return float(i) / float(MaxIterations);
+}
+
+// Julia set iteration
+float ALICE_Julia(float2 z, float2 c, int MaxIterations, float EscapeRadius)
+{
+    int i = 0;
+    float escape2 = EscapeRadius * EscapeRadius;
+
+    for (int iter = 0; iter < 256; iter++)
+    {
+        if (iter >= MaxIterations) break;
+        if (dot(z, z) > escape2) break;
+
+        z = float2(
+            z.x * z.x - z.y * z.y + c.x,
+            2.0 * z.x * z.y + c.y
+        );
+        i++;
+    }
+
+    if (i >= MaxIterations) return 0.0;
+    return float(i) / float(MaxIterations);
+}
+
+// ============================================
+// Utility Functions
+// ============================================
+
+// Transform UV with zoom and pan (infinite canvas)
+float2 ALICE_TransformUV(float2 UV, float Zoom, float2 Pan)
+{
+    return (UV - 0.5) / Zoom + Pan;
+}
+
+// HSV to RGB conversion
+float3 ALICE_HSVtoRGB(float3 hsv)
+{
+    float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    float3 p = abs(frac(hsv.xxx + K.xyz) * 6.0 - K.www);
+    return hsv.z * lerp(K.xxx, saturate(p - K.xxx), hsv.y);
+}
+
+// Compute gradient of noise field (for motion vectors)
+float2 ALICE_ComputeGradient(float2 p, float Epsilon)
+{
+    float dx = ALICE_GradientNoise(p + float2(Epsilon, 0.0)) - ALICE_GradientNoise(p - float2(Epsilon, 0.0));
+    float dy = ALICE_GradientNoise(p + float2(0.0, Epsilon)) - ALICE_GradientNoise(p - float2(0.0, Epsilon));
+    return float2(dx, dy) / (2.0 * Epsilon);
+}

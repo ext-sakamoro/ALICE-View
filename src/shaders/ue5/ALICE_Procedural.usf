@@ -1,0 +1,230 @@
+// ALICE Procedural Content Generators for Unreal Engine 5
+// "Store equations, not pixels" - GPU-computed infinite resolution
+//
+// Usage in Material Custom Expression:
+// #include "/Project/ALICE/ALICE_Common.usf"
+// #include "/Project/ALICE/ALICE_Procedural.usf"
+
+#pragma once
+#include "ALICE_Common.usf"
+
+// ============================================
+// Perlin Terrain Generator
+// ============================================
+
+struct ALICE_TerrainResult
+{
+    float Height;
+    float3 Color;
+    float3 Normal;
+};
+
+ALICE_TerrainResult ALICE_GenerateTerrain(float2 WorldPos, float Scale, int Octaves)
+{
+    ALICE_TerrainResult result;
+
+    float n = ALICE_FBM(WorldPos * Scale, Octaves, 0.5, 2.0);
+    result.Height = n;
+
+    // Terrain coloring based on height
+    float3 lowColor = float3(0.1, 0.2, 0.4);   // Deep water
+    float3 midColor = float3(0.3, 0.6, 0.3);   // Grass
+    float3 highColor = float3(0.9, 0.8, 0.6);  // Mountain
+    float3 peakColor = float3(1.0, 1.0, 1.0);  // Snow
+
+    if (n < 0.3)
+        result.Color = lerp(lowColor, midColor, n / 0.3);
+    else if (n < 0.6)
+        result.Color = lerp(midColor, highColor, (n - 0.3) / 0.3);
+    else
+        result.Color = lerp(highColor, peakColor, (n - 0.6) / 0.4);
+
+    // Compute normal from gradient
+    float eps = 0.01 / Scale;
+    float hL = ALICE_FBM((WorldPos + float2(-eps, 0.0)) * Scale, Octaves, 0.5, 2.0);
+    float hR = ALICE_FBM((WorldPos + float2(eps, 0.0)) * Scale, Octaves, 0.5, 2.0);
+    float hD = ALICE_FBM((WorldPos + float2(0.0, -eps)) * Scale, Octaves, 0.5, 2.0);
+    float hU = ALICE_FBM((WorldPos + float2(0.0, eps)) * Scale, Octaves, 0.5, 2.0);
+
+    result.Normal = normalize(float3(hL - hR, hD - hU, 2.0 * eps));
+
+    return result;
+}
+
+// ============================================
+// Fractal Colorizer
+// ============================================
+
+float3 ALICE_FractalColor(float t, float Time)
+{
+    // Smooth rainbow coloring with time animation
+    float hue = t + Time * 0.1;
+    return float3(
+        0.5 + 0.5 * cos(6.28318 * hue),
+        0.5 + 0.5 * cos(6.28318 * (hue + 0.333)),
+        0.5 + 0.5 * cos(6.28318 * (hue + 0.666))
+    );
+}
+
+float3 ALICE_GenerateMandelbrot(float2 UV, float Zoom, float2 Pan, int MaxIterations, float Time)
+{
+    float2 worldPos = ALICE_TransformUV(UV, Zoom, Pan);
+    float2 c = worldPos * 3.0 + float2(-0.5, 0.0);
+
+    float t = ALICE_Mandelbrot(c, MaxIterations, 2.0);
+
+    if (t == 0.0)
+        return float3(0.0, 0.0, 0.0);
+
+    return ALICE_FractalColor(t, Time);
+}
+
+float3 ALICE_GenerateJulia(float2 UV, float Zoom, float2 Pan, float2 JuliaC, int MaxIterations, float Time)
+{
+    float2 worldPos = ALICE_TransformUV(UV, Zoom, Pan);
+    float2 z = worldPos * 2.0;
+
+    float t = ALICE_Julia(z, JuliaC, MaxIterations, 2.0);
+
+    if (t == 0.0)
+        return float3(0.0, 0.0, 0.0);
+
+    return ALICE_FractalColor(t, Time);
+}
+
+// ============================================
+// Voronoi Patterns
+// ============================================
+
+float3 ALICE_GenerateVoronoi(float2 UV, float Zoom, float2 Pan, float Scale, float EdgeWidth)
+{
+    float2 worldPos = ALICE_TransformUV(UV, Zoom, Pan);
+    float2 p = worldPos * Scale;
+
+    ALICE_VoronoiResult vor = ALICE_Voronoi(p, 1.0);
+
+    // Cell color from hash
+    float3 cellColor = float3(
+        ALICE_Hash2(vor.CellCenter),
+        ALICE_Hash2(vor.CellCenter + float2(17.0, 31.0)),
+        ALICE_Hash2(vor.CellCenter + float2(73.0, 89.0))
+    );
+
+    // Edge detection
+    float edge = smoothstep(0.0, EdgeWidth, vor.Distance);
+
+    return cellColor * edge;
+}
+
+// ============================================
+// Animated Patterns
+// ============================================
+
+float3 ALICE_GenerateFlowField(float2 UV, float Zoom, float2 Pan, float Scale, float Time)
+{
+    float2 worldPos = ALICE_TransformUV(UV, Zoom, Pan);
+
+    // Compute flow vectors
+    float2 flow = ALICE_ComputeGradient(worldPos * Scale + Time * 0.5, 0.01);
+
+    // Visualize as color
+    float magnitude = length(flow);
+    float2 direction = flow / max(magnitude, 0.001);
+
+    float r = abs(direction.y) * 0.8 + 0.2;
+    float g = abs(direction.x) * 0.8 + 0.2;
+    float b = magnitude * 2.0;
+
+    return float3(r, g, b);
+}
+
+float3 ALICE_GeneratePlasma(float2 UV, float Zoom, float2 Pan, float Time)
+{
+    float2 worldPos = ALICE_TransformUV(UV, Zoom, Pan);
+
+    float v1 = sin(worldPos.x * 10.0 + Time);
+    float v2 = sin(worldPos.y * 10.0 + Time * 0.5);
+    float v3 = sin((worldPos.x + worldPos.y) * 10.0 + Time * 0.7);
+    float v4 = sin(length(worldPos * 10.0) + Time);
+
+    float v = (v1 + v2 + v3 + v4) * 0.25 + 0.5;
+
+    return ALICE_HSVtoRGB(float3(v, 0.8, 0.9));
+}
+
+// ============================================
+// Wireframe / Debug Visualization
+// ============================================
+
+float3 ALICE_GenerateWireframe(float2 UV, float Zoom, float2 Pan, float GridSize, float LineWidth, float Time)
+{
+    float2 worldPos = ALICE_TransformUV(UV, Zoom, Pan);
+    float2 p = worldPos / GridSize;
+    float2 f = frac(p);
+
+    // Triangle edges
+    float minDist = min(min(f.y, f.x), abs(f.x + f.y - 1.0) / 1.414);
+    float wire = 1.0 - smoothstep(0.0, LineWidth, minDist);
+
+    // Glow effect
+    float glow = exp(-minDist * 10.0) * 0.3;
+
+    // Vertex highlights
+    float vertexDist = min(
+        min(length(f), length(f - float2(1.0, 0.0))),
+        min(length(f - float2(0.0, 1.0)), length(f - float2(1.0, 1.0)))
+    );
+    float vertex = 1.0 - smoothstep(0.0, 0.05, vertexDist);
+
+    // Animate
+    float pulse = 0.5 + 0.5 * sin(Time * 2.0 - length(worldPos) * 3.0);
+
+    float3 color = float3(0.02, 0.05, 0.08);
+    color += float3(0.0, 1.0, 1.0) * wire;
+    color += float3(0.0, 0.3, 0.4) * glow;
+    color += float3(1.0, 1.0, 1.0) * vertex * 0.8;
+    color *= 0.7 + 0.3 * pulse;
+
+    return color;
+}
+
+// ============================================
+// Main Content Generator (Switch-based)
+// ============================================
+
+// ContentType: 0=Perlin, 1=Mandelbrot, 2=Julia, 3=Voronoi, 4=Plasma, 5=Wireframe
+float3 ALICE_GenerateContent(
+    float2 UV,
+    int ContentType,
+    float Zoom,
+    float2 Pan,
+    float Scale,
+    float Time,
+    int Octaves,
+    int MaxIterations,
+    float2 JuliaC
+)
+{
+    switch (ContentType)
+    {
+        case 0: // Perlin Terrain
+        {
+            ALICE_TerrainResult terrain = ALICE_GenerateTerrain(
+                ALICE_TransformUV(UV, Zoom, Pan), Scale, Octaves
+            );
+            return terrain.Color;
+        }
+        case 1: // Mandelbrot
+            return ALICE_GenerateMandelbrot(UV, Zoom, Pan, MaxIterations, Time);
+        case 2: // Julia
+            return ALICE_GenerateJulia(UV, Zoom, Pan, JuliaC, MaxIterations, Time);
+        case 3: // Voronoi
+            return ALICE_GenerateVoronoi(UV, Zoom, Pan, Scale, 0.05);
+        case 4: // Plasma
+            return ALICE_GeneratePlasma(UV, Zoom, Pan, Time);
+        case 5: // Wireframe
+            return ALICE_GenerateWireframe(UV, Zoom, Pan, 0.1, 0.02, Time);
+        default:
+            return float3(0.5, 0.5, 0.5);
+    }
+}
