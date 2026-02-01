@@ -6,7 +6,7 @@ mod infinite_zoom;
 pub use pipeline::*;
 pub use infinite_zoom::*;
 
-use crate::app::ViewerState;
+use crate::app::{RenderMode, ViewerState};
 use crate::decoder::Decoder;
 use crate::ui::Ui;
 use anyhow::Result;
@@ -21,7 +21,10 @@ pub struct Renderer {
     queue: Queue,
     config: SurfaceConfiguration,
     size: PhysicalSize<u32>,
-    pipeline: ProceduralPipeline,
+    // 2D procedural pipeline
+    procedural_pipeline: ProceduralPipeline,
+    // 3D SDF raymarching pipeline
+    sdf_pipeline: SdfPipeline,
     egui_renderer: egui_wgpu::Renderer,
     egui_state: egui_winit::State,
     egui_ctx: egui::Context,
@@ -87,7 +90,9 @@ impl Renderer {
         };
         surface.configure(&device, &config);
 
-        let pipeline = ProceduralPipeline::new(&device, surface_format);
+        // Create both pipelines
+        let procedural_pipeline = ProceduralPipeline::new(&device, surface_format);
+        let sdf_pipeline = SdfPipeline::new(&device, surface_format);
 
         let egui_ctx = egui::Context::default();
         let viewport_id = egui_ctx.viewport_id();
@@ -106,7 +111,8 @@ impl Renderer {
             queue,
             config,
             size,
-            pipeline,
+            procedural_pipeline,
+            sdf_pipeline,
             egui_renderer,
             egui_state,
             egui_ctx,
@@ -127,6 +133,20 @@ impl Renderer {
         &self.egui_ctx
     }
 
+    /// Rebuild SDF pipeline with dynamic WGSL shader from .asdf file
+    ///
+    /// This allows loading arbitrary SDF trees and rendering them in real-time.
+    pub fn rebuild_sdf_pipeline_with_wgsl(&mut self, sdf_wgsl: &str) {
+        tracing::info!("Rebuilding SDF pipeline with dynamic shader...");
+        self.sdf_pipeline = self.sdf_pipeline.rebuild_with_dynamic_sdf(&self.device, sdf_wgsl);
+        tracing::info!("SDF pipeline rebuilt successfully");
+    }
+
+    /// Check if dynamic SDF is currently loaded
+    pub fn has_dynamic_sdf(&self) -> bool {
+        self.sdf_pipeline.has_dynamic_sdf()
+    }
+
     pub fn render(&mut self, state: &mut ViewerState, decoder: &Decoder, ui: &mut Ui) -> Result<()> {
         let output = match self.surface.get_current_texture() {
             Ok(output) => output,
@@ -145,7 +165,17 @@ impl Renderer {
 
         let time = self.start_time.elapsed().as_secs_f32();
         let resolution = [self.size.width as f32, self.size.height as f32];
-        self.pipeline.update_uniforms(&self.queue, state, time, resolution);
+
+        // Update appropriate pipeline uniforms based on render mode
+        match state.render_mode {
+            RenderMode::Procedural2D => {
+                self.procedural_pipeline.update_uniforms(&self.queue, state, time, resolution);
+            }
+            RenderMode::Sdf3D => {
+                let scene_id = ui.sdf_scene_id();
+                self.sdf_pipeline.update_uniforms(&self.queue, state, time, resolution, scene_id);
+            }
+        }
 
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -163,7 +193,15 @@ impl Renderer {
                 occlusion_query_set: None,
             });
 
-            self.pipeline.render(&mut render_pass, state, decoder);
+            // Render with appropriate pipeline
+            match state.render_mode {
+                RenderMode::Procedural2D => {
+                    self.procedural_pipeline.render(&mut render_pass, state, decoder);
+                }
+                RenderMode::Sdf3D => {
+                    self.sdf_pipeline.render(&mut render_pass);
+                }
+            }
         }
 
         let screen_descriptor = egui_wgpu::ScreenDescriptor {

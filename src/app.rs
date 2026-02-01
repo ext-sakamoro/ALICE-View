@@ -3,6 +3,7 @@
 use crate::decoder::Decoder;
 use crate::renderer::Renderer;
 use crate::ui::Ui;
+use glam::Vec3;
 use std::sync::Arc;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -12,6 +13,98 @@ use winit::{
     window::Window,
 };
 
+/// 3D Camera for raymarching
+#[derive(Debug, Clone)]
+pub struct Camera3D {
+    /// Camera position in world space
+    pub position: Vec3,
+    /// Look-at target point
+    pub target: Vec3,
+    /// Up vector (usually Y-up)
+    pub up: Vec3,
+    /// Field of view in radians
+    pub fov: f32,
+    /// Near clipping plane
+    pub near: f32,
+    /// Far clipping plane (max raymarch distance)
+    pub far: f32,
+}
+
+impl Default for Camera3D {
+    fn default() -> Self {
+        Self {
+            position: Vec3::new(0.0, 0.0, 5.0),
+            target: Vec3::ZERO,
+            up: Vec3::Y,
+            fov: std::f32::consts::FRAC_PI_4, // 45 degrees
+            near: 0.01,
+            far: 100.0,
+        }
+    }
+}
+
+impl Camera3D {
+    /// Get view direction (normalized)
+    pub fn forward(&self) -> Vec3 {
+        (self.target - self.position).normalize()
+    }
+
+    /// Get right vector (normalized)
+    pub fn right(&self) -> Vec3 {
+        self.forward().cross(self.up).normalize()
+    }
+
+    /// Orbit around target (spherical coordinates)
+    pub fn orbit(&mut self, delta_theta: f32, delta_phi: f32) {
+        let radius = (self.position - self.target).length();
+        let offset = self.position - self.target;
+
+        // Current spherical coordinates
+        let mut theta = offset.z.atan2(offset.x);
+        let mut phi = (offset.y / radius).acos();
+
+        // Apply rotation
+        theta += delta_theta;
+        phi = (phi + delta_phi).clamp(0.01, std::f32::consts::PI - 0.01);
+
+        // Convert back to Cartesian
+        self.position = self.target + Vec3::new(
+            radius * phi.sin() * theta.cos(),
+            radius * phi.cos(),
+            radius * phi.sin() * theta.sin(),
+        );
+    }
+
+    /// Dolly (move along view direction)
+    pub fn dolly(&mut self, distance: f32) {
+        let direction = self.forward();
+        self.position += direction * distance;
+        // Keep minimum distance from target
+        let to_target = self.target - self.position;
+        if to_target.length() < 0.5 {
+            self.position = self.target - direction * 0.5;
+        }
+    }
+
+    /// Pan (move camera and target together)
+    pub fn pan(&mut self, delta_x: f32, delta_y: f32) {
+        let right = self.right();
+        let up = self.up;
+        let offset = right * delta_x + up * delta_y;
+        self.position += offset;
+        self.target += offset;
+    }
+}
+
+/// Render mode selection
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderMode {
+    /// 2D procedural content (legacy)
+    #[default]
+    Procedural2D,
+    /// 3D SDF raymarching
+    Sdf3D,
+}
 
 /// Application state
 pub struct App {
@@ -31,13 +124,26 @@ pub struct App {
 /// Viewer state
 #[derive(Default)]
 pub struct ViewerState {
+    // 2D controls (legacy)
     pub zoom: f32,
     pub pan: [f32; 2],
+
+    // 3D camera
+    pub camera: Camera3D,
+    pub render_mode: RenderMode,
+
+    // Visualization options
     pub xray_mode: bool,
     pub xray_type: XRayType,
     pub show_stats: bool,
     pub paused: bool,
     pub stats: FrameStats,
+
+    // SDF-specific options
+    pub sdf_max_steps: u32,
+    pub sdf_epsilon: f32,
+    pub sdf_show_normals: bool,
+    pub sdf_ambient_occlusion: bool,
 }
 
 /// X-Ray visualization types
@@ -104,6 +210,17 @@ impl Default for ViewerConfig {
 
 impl App {
     pub fn new(initial_file: Option<String>) -> Self {
+        // Auto-detect render mode from file extension
+        let render_mode = initial_file.as_ref()
+            .map(|f| {
+                if f.ends_with(".asdf") || f.ends_with(".asdf.json") {
+                    RenderMode::Sdf3D
+                } else {
+                    RenderMode::Procedural2D
+                }
+            })
+            .unwrap_or(RenderMode::Procedural2D);
+
         Self {
             window: None,
             renderer: None,
@@ -112,6 +229,8 @@ impl App {
             state: ViewerState {
                 zoom: 1.0,
                 pan: [0.0, 0.0],
+                camera: Camera3D::default(),
+                render_mode,
                 xray_mode: false,
                 xray_type: XRayType::default(),
                 show_stats: false,
@@ -123,6 +242,10 @@ impl App {
                     gpu_usage: 0.0,
                     resolution: "∞ (Procedural)".to_string(),
                 },
+                sdf_max_steps: 128,
+                sdf_epsilon: 0.001,
+                sdf_show_normals: false,
+                sdf_ambient_occlusion: true,
             },
             initial_file,
             mouse_pressed: false,
@@ -133,6 +256,17 @@ impl App {
 
     /// Create App with custom configuration (for library usage)
     pub fn with_config(config: ViewerConfig) -> Self {
+        // Auto-detect render mode from file extension
+        let render_mode = config.initial_file.as_ref()
+            .map(|f| {
+                if f.ends_with(".asdf") || f.ends_with(".asdf.json") {
+                    RenderMode::Sdf3D
+                } else {
+                    RenderMode::Procedural2D
+                }
+            })
+            .unwrap_or(RenderMode::Procedural2D);
+
         Self {
             window: None,
             renderer: None,
@@ -141,6 +275,8 @@ impl App {
             state: ViewerState {
                 zoom: config.initial_zoom,
                 pan: config.initial_pan,
+                camera: Camera3D::default(),
+                render_mode,
                 xray_mode: config.xray_mode,
                 xray_type: config.xray_type,
                 show_stats: config.show_stats,
@@ -152,6 +288,10 @@ impl App {
                     gpu_usage: 0.0,
                     resolution: "∞ (Procedural)".to_string(),
                 },
+                sdf_max_steps: 128,
+                sdf_epsilon: 0.001,
+                sdf_show_normals: false,
+                sdf_ambient_occlusion: true,
             },
             initial_file: config.initial_file.clone(),
             mouse_pressed: false,
@@ -195,7 +335,74 @@ impl App {
 
         tracing::debug!("Key pressed: {:?}", key);
 
+        // Camera movement speed
+        let move_speed = 0.3;
+        let pan_speed = 0.2;
+
         match key {
+            // 3D Camera controls (WASD + QE)
+            KeyCode::KeyW => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera.dolly(move_speed);
+                }
+            }
+            KeyCode::KeyS => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera.dolly(-move_speed);
+                }
+            }
+            KeyCode::KeyA => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera.pan(-pan_speed, 0.0);
+                }
+            }
+            KeyCode::KeyD => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera.pan(pan_speed, 0.0);
+                }
+            }
+            KeyCode::KeyQ => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera.pan(0.0, pan_speed);
+                }
+            }
+            KeyCode::KeyE => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera.pan(0.0, -pan_speed);
+                }
+            }
+            KeyCode::KeyR => {
+                // Reset camera to default
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.camera = Camera3D::default();
+                    tracing::info!("Camera reset to default");
+                }
+            }
+
+            // Toggle between 2D/3D modes
+            KeyCode::KeyM => {
+                self.state.render_mode = match self.state.render_mode {
+                    RenderMode::Procedural2D => RenderMode::Sdf3D,
+                    RenderMode::Sdf3D => RenderMode::Procedural2D,
+                };
+                tracing::info!("Render mode: {:?}", self.state.render_mode);
+            }
+
+            // SDF visualization options
+            KeyCode::KeyN => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.sdf_show_normals = !self.state.sdf_show_normals;
+                    tracing::info!("Show normals: {}", self.state.sdf_show_normals);
+                }
+            }
+            KeyCode::KeyO => {
+                if self.state.render_mode == RenderMode::Sdf3D {
+                    self.state.sdf_ambient_occlusion = !self.state.sdf_ambient_occlusion;
+                    tracing::info!("Ambient occlusion: {}", self.state.sdf_ambient_occlusion);
+                }
+            }
+
+            // General controls
             KeyCode::F1 => {
                 self.state.xray_mode = !self.state.xray_mode;
                 tracing::info!("X-Ray mode: {}", self.state.xray_mode);
@@ -237,13 +444,23 @@ impl App {
     }
 
     fn handle_scroll(&mut self, delta: f32) {
-        let zoom_factor = 1.1f32;
-        if delta > 0.0 {
-            self.state.zoom *= zoom_factor;
-        } else {
-            self.state.zoom /= zoom_factor;
+        match self.state.render_mode {
+            RenderMode::Procedural2D => {
+                // 2D: Zoom in/out
+                let zoom_factor = 1.1f32;
+                if delta > 0.0 {
+                    self.state.zoom *= zoom_factor;
+                } else {
+                    self.state.zoom /= zoom_factor;
+                }
+                self.state.zoom = self.state.zoom.clamp(0.001, 1_000_000.0);
+            }
+            RenderMode::Sdf3D => {
+                // 3D: Dolly camera forward/backward
+                let dolly_speed = 0.5;
+                self.state.camera.dolly(delta * dolly_speed);
+            }
         }
-        self.state.zoom = self.state.zoom.clamp(0.001, 1_000_000.0);
     }
 
     /// Main event handling logic (winit 0.29 style)
@@ -295,17 +512,29 @@ impl App {
                 WindowEvent::MouseInput { state, button: winit::event::MouseButton::Left, .. } => {
                     self.mouse_pressed = state == ElementState::Pressed;
                 }
-                // Mouse movement (drag to pan)
+                // Mouse movement (drag to pan/orbit)
                 WindowEvent::CursorMoved { position, .. } => {
                     if self.mouse_pressed {
                         if let Some(last_pos) = self.last_mouse_pos {
                             let dx = (position.x - last_pos.x) as f32;
                             let dy = (position.y - last_pos.y) as f32;
 
-                            // Scale movement by zoom level (higher zoom = finer movement)
-                            let sensitivity = 0.002 / self.state.zoom;
-                            self.state.pan[0] -= dx * sensitivity;
-                            self.state.pan[1] += dy * sensitivity; // Y-axis inverted
+                            match self.state.render_mode {
+                                RenderMode::Procedural2D => {
+                                    // 2D: Scale movement by zoom level
+                                    let sensitivity = 0.002 / self.state.zoom;
+                                    self.state.pan[0] -= dx * sensitivity;
+                                    self.state.pan[1] += dy * sensitivity;
+                                }
+                                RenderMode::Sdf3D => {
+                                    // 3D: Orbit camera around target
+                                    let orbit_sensitivity = 0.01;
+                                    self.state.camera.orbit(
+                                        -dx * orbit_sensitivity,
+                                        dy * orbit_sensitivity,
+                                    );
+                                }
+                            }
 
                             if let Some(window) = &self.window {
                                 window.request_redraw();
@@ -319,6 +548,13 @@ impl App {
                         self.ui.update(&mut self.state, &mut self.decoder);
 
                         let renderer = self.renderer.as_mut().unwrap();
+
+                        // Check for pending WGSL shader from loaded .asdf file
+                        // and rebuild the SDF pipeline with dynamic shader
+                        if let Some(wgsl) = self.ui.take_pending_wgsl() {
+                            renderer.rebuild_sdf_pipeline_with_wgsl(&wgsl);
+                        }
+
                         if let Err(e) = renderer.render(&mut self.state, &self.decoder, &mut self.ui) {
                             tracing::error!("Render error: {}", e);
                         }

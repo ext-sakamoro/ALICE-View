@@ -5,11 +5,13 @@
 //! - Arc<Vec<u8>> for zero-copy raster data
 
 pub mod alice;
+pub mod asdf;
 mod alz;
 mod asp;
 
 pub use alice::*;
 pub use alz::*;
+pub use asdf::*;
 pub use asp::*;
 
 use anyhow::{Context, Result};
@@ -27,6 +29,8 @@ pub enum ContentType {
     AliceZip,
     /// ALICE Streaming Protocol
     AspStream,
+    /// ALICE-SDF 3D content
+    AliceSdf,
     /// Standard image (fallback)
     Image,
     /// Standard video (fallback)
@@ -93,6 +97,8 @@ pub struct Decoder {
     compressed_size: u64,
     /// Loaded ALICE file (for file info display)
     alice_file: Option<alice::AliceFile>,
+    /// Loaded SDF content (for 3D visualization)
+    sdf_content: Option<asdf::SdfContent>,
 }
 
 impl Decoder {
@@ -104,7 +110,13 @@ impl Decoder {
             original_size: 0,
             compressed_size: 0,
             alice_file: None,
+            sdf_content: None,
         }
+    }
+
+    /// Get loaded SDF content (if available)
+    pub fn sdf_content(&self) -> Option<&asdf::SdfContent> {
+        self.sdf_content.as_ref()
     }
 
     /// Get loaded ALICE file (if available)
@@ -132,6 +144,13 @@ impl Decoder {
 
         self.file_path = Some(path.to_string_lossy().to_string());
         self.alice_file = None; // Reset
+        self.sdf_content = None; // Reset
+
+        // Check for .asdf.json first (compound extension)
+        let path_str = path.to_string_lossy();
+        if path_str.ends_with(".asdf.json") || path_str.ends_with(".asdf") {
+            return self.load_asdf_async(path_buf).await;
+        }
 
         let (content, c_type, o_size, c_size, alice_file) = match extension.as_str() {
             "alz" | "alice" => Self::load_alice_async(path_buf).await?,
@@ -154,6 +173,41 @@ impl Decoder {
         self.original_size = o_size;
         self.compressed_size = c_size;
         self.alice_file = alice_file;
+
+        Ok(())
+    }
+
+    /// Load ASDF file (SDF 3D content)
+    async fn load_asdf_async(&mut self, path: PathBuf) -> Result<()> {
+        tracing::info!("Loading ASDF file: {:?}", path);
+
+        // Load SDF in blocking thread (file I/O)
+        let sdf_content = tokio::task::spawn_blocking(move || {
+            asdf::SdfContent::load(&path)
+        })
+        .await
+        .context("Spawn blocking task failed")??;
+
+        // Get file size for stats
+        let metadata = fs::metadata(&self.file_path.as_ref().unwrap()).await?;
+        let file_size = metadata.len();
+
+        // Estimate original size (mesh equivalent would be much larger)
+        // SDF is extremely compact compared to mesh representation
+        let estimated_original = file_size * 100; // Conservative estimate
+
+        tracing::info!(
+            "ASDF loaded: {} nodes, bounds: {:?} - {:?}",
+            sdf_content.node_count,
+            sdf_content.bounds.0,
+            sdf_content.bounds.1
+        );
+
+        self.sdf_content = Some(sdf_content);
+        self.content_type = ContentType::AliceSdf;
+        self.content = None; // SDF uses separate content
+        self.original_size = estimated_original;
+        self.compressed_size = file_size;
 
         Ok(())
     }

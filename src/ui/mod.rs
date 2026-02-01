@@ -8,13 +8,15 @@ mod viewport;
 mod xray;
 mod stats;
 pub mod file_info;
+pub mod sdf_panel;
 
 pub use viewport::*;
 pub use xray::*;
 pub use stats::*;
 pub use file_info::*;
+pub use sdf_panel::*;
 
-use crate::app::{ViewerState, XRayType};
+use crate::app::{RenderMode, ViewerState, XRayType};
 use crate::decoder::Decoder;
 use egui::FullOutput;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -35,6 +37,10 @@ pub struct Ui {
     file_loader_tx: Sender<String>,
     /// Current file info
     current_file_info: Option<FileInfo>,
+    /// SDF control panel
+    sdf_panel: SdfPanel,
+    /// Pending WGSL shader for pipeline rebuild (set when .asdf is loaded)
+    pending_wgsl: Option<String>,
 }
 
 impl Ui {
@@ -47,7 +53,14 @@ impl Ui {
             file_loader_rx: rx,
             file_loader_tx: tx,
             current_file_info: None,
+            sdf_panel: SdfPanel::new(),
+            pending_wgsl: None,
         }
+    }
+
+    /// Get current SDF scene ID for shader
+    pub fn sdf_scene_id(&self) -> u32 {
+        self.sdf_panel.scene_id()
     }
 
     /// Get current file info
@@ -75,7 +88,29 @@ impl Ui {
             if let Err(e) = decoder.load(&path) {
                 tracing::error!("Failed to load file: {}", e);
                 self.current_file_info = None;
+                self.sdf_panel.set_dynamic_sdf(false, None);
             } else {
+                // Check if SDF content was loaded (for .asdf files)
+                if let Some(sdf_content) = decoder.sdf_content() {
+                    // Generate WGSL shader for the loaded SDF
+                    let wgsl = sdf_content.to_wgsl();
+                    tracing::info!(
+                        "Generated WGSL for SDF: {} nodes, {} bytes",
+                        sdf_content.node_count,
+                        wgsl.len()
+                    );
+
+                    // Store for renderer to pick up
+                    self.pending_wgsl = Some(wgsl);
+
+                    // Notify SDF panel
+                    let info = format!("{} nodes", sdf_content.node_count);
+                    self.sdf_panel.set_dynamic_sdf(true, Some(info));
+
+                    // Switch to 3D mode
+                    state.render_mode = RenderMode::Sdf3D;
+                }
+
                 // Update file info if alice file was loaded
                 if let Some(alice_file) = decoder.alice_file() {
                     self.current_file_info = Some(FileInfo::from_alice_file(alice_file, Some(&path)));
@@ -86,6 +121,14 @@ impl Ui {
                 }
             }
         }
+    }
+
+    /// Take pending WGSL shader (for pipeline rebuild)
+    ///
+    /// Returns the WGSL shader source if a new .asdf was loaded,
+    /// clearing the pending state.
+    pub fn take_pending_wgsl(&mut self) -> Option<String> {
+        self.pending_wgsl.take()
     }
 
     /// Toggle file info panel
@@ -99,6 +142,7 @@ impl Ui {
         thread::spawn(move || {
             // Runs in background - UI continues rendering at full speed
             if let Some(path) = rfd::FileDialog::new()
+                .add_filter("ALICE SDF", &["asdf"])
                 .add_filter("ALICE Files", &["alz", "alice", "asp"])
                 .add_filter("Images", &["png", "jpg", "jpeg", "bmp"])
                 .add_filter("All Files", &["*"])
@@ -187,7 +231,19 @@ impl Ui {
 
                 // Status indicators (inline after menus)
                 ui.separator();
-                ui.label(format!("Zoom: {:.2}x", state.zoom));
+
+                // Show mode-specific info
+                match state.render_mode {
+                    RenderMode::Procedural2D => {
+                        ui.label(format!("Zoom: {:.2}x", state.zoom));
+                    }
+                    RenderMode::Sdf3D => {
+                        ui.label(egui::RichText::new("3D").color(egui::Color32::from_rgb(100, 200, 255)));
+                        ui.separator();
+                        ui.label(format!("Steps: {}", state.sdf_max_steps));
+                    }
+                }
+
                 ui.separator();
                 if state.paused {
                     ui.label(egui::RichText::new("⏸ PAUSED").color(egui::Color32::YELLOW));
@@ -219,6 +275,9 @@ impl Ui {
         if state.xray_mode {
             render_xray_overlay(ctx, state);
         }
+
+        // 4. SDF Control Panel (only in 3D mode)
+        self.sdf_panel.render(ctx, state);
 
         // 4. File Info Panel (right side)
         if self.file_info_open {
