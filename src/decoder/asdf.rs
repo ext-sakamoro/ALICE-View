@@ -5,7 +5,7 @@
 //! Author: Moroya Sakamoto
 
 use alice_sdf::prelude::*;
-use alice_sdf::compiled::WgslShader;
+use alice_sdf::compiled::{WgslShader, TranspileMode};
 use anyhow::{Context, Result};
 use std::path::Path;
 
@@ -31,13 +31,18 @@ impl SdfContent {
             .unwrap_or("");
 
         let tree = if path.to_string_lossy().ends_with(".asdf.json") {
-            // JSON format
+            // Compound extension: .asdf.json
             tracing::info!("Loading ASDF JSON: {:?}", path);
             alice_sdf::load(path).context("Failed to load ASDF JSON")?
         } else if extension == "asdf" {
             // Binary format
             tracing::info!("Loading ASDF binary: {:?}", path);
             alice_sdf::load(path).context("Failed to load ASDF binary")?
+        } else if extension == "json" {
+            // Plain .json — load using JSON parser directly
+            // (alice_sdf::load() only accepts .asdf/.asdf.json extensions)
+            tracing::info!("Loading SDF JSON: {:?}", path);
+            load_asdf_json(path).context("Failed to load SDF JSON")?
         } else {
             anyhow::bail!("Unknown SDF format: {}", extension);
         };
@@ -104,7 +109,7 @@ impl SdfContent {
     /// Uses ALICE-SDF's WgslShader transpiler to convert the SDF tree
     /// to optimized WGSL code for GPU evaluation.
     pub fn to_wgsl(&self) -> String {
-        let shader = WgslShader::transpile(&self.tree.root);
+        let shader = WgslShader::transpile(&self.tree.root, TranspileMode::Hardcoded);
         tracing::info!(
             "Transpiled SDF to WGSL: {} nodes → {} bytes, {} helpers",
             self.node_count,
@@ -116,15 +121,15 @@ impl SdfContent {
 
     /// Get the raw WGSL source with metadata
     pub fn to_wgsl_with_metadata(&self) -> (String, usize, usize) {
-        let shader = WgslShader::transpile(&self.tree.root);
+        let shader = WgslShader::transpile(&self.tree.root, TranspileMode::Hardcoded);
         (shader.source, self.node_count, shader.helper_count)
     }
 }
 
-/// Check if a file is an ASDF file
+/// Check if a file is an ASDF/SDF JSON file
 pub fn is_asdf_file(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
-    path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json")
+    path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json") || path_str.ends_with(".json")
 }
 
 #[cfg(test)]

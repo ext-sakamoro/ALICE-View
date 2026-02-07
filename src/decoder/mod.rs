@@ -127,9 +127,48 @@ impl Decoder {
     /// Load content from file path (synchronous wrapper for compatibility)
     /// For async loading, use load_async() instead
     pub fn load(&mut self, path: &str) -> Result<()> {
-        // Use pollster to block on async in sync context
-        // This is safe when called from background thread (file_loader)
+        let p = Path::new(path);
+        let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let path_str_cow = p.to_string_lossy();
+
+        // ASDF/SDF files: load synchronously (avoids Tokio runtime requirement)
+        if path_str_cow.ends_with(".asdf.json") || path_str_cow.ends_with(".asdf") || ext == "json" {
+            return self.load_asdf_sync(path);
+        }
+
+        // Other formats: use pollster to block on async
         pollster::block_on(self.load_async(path))
+    }
+
+    /// Load ASDF/SDF file synchronously (no Tokio runtime required)
+    fn load_asdf_sync(&mut self, path: &str) -> Result<()> {
+        let p = Path::new(path);
+        tracing::info!("Loading ASDF/SDF file (sync): {:?}", p);
+
+        self.file_path = Some(path.to_string());
+        self.alice_file = None;
+        self.sdf_content = None;
+
+        let sdf_content = asdf::SdfContent::load(p)?;
+
+        let metadata = std::fs::metadata(p)?;
+        let file_size = metadata.len();
+        let estimated_original = file_size * 100;
+
+        tracing::info!(
+            "ASDF loaded: {} nodes, bounds: {:?} - {:?}",
+            sdf_content.node_count,
+            sdf_content.bounds.0,
+            sdf_content.bounds.1
+        );
+
+        self.sdf_content = Some(sdf_content);
+        self.content_type = ContentType::AliceSdf;
+        self.content = None;
+        self.original_size = estimated_original;
+        self.compressed_size = file_size;
+
+        Ok(())
     }
 
     /// Load content asynchronously (non-blocking)
@@ -146,9 +185,9 @@ impl Decoder {
         self.alice_file = None; // Reset
         self.sdf_content = None; // Reset
 
-        // Check for .asdf.json first (compound extension)
+        // Check for SDF files first (compound extension .asdf.json, binary .asdf, or plain .json)
         let path_str = path.to_string_lossy();
-        if path_str.ends_with(".asdf.json") || path_str.ends_with(".asdf") {
+        if path_str.ends_with(".asdf.json") || path_str.ends_with(".asdf") || extension == "json" {
             return self.load_asdf_async(path_buf).await;
         }
 

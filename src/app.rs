@@ -213,7 +213,7 @@ impl App {
         // Auto-detect render mode from file extension
         let render_mode = initial_file.as_ref()
             .map(|f| {
-                if f.ends_with(".asdf") || f.ends_with(".asdf.json") {
+                if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
                     RenderMode::Sdf3D
                 } else {
                     RenderMode::Procedural2D
@@ -259,7 +259,7 @@ impl App {
         // Auto-detect render mode from file extension
         let render_mode = config.initial_file.as_ref()
             .map(|f| {
-                if f.ends_with(".asdf") || f.ends_with(".asdf.json") {
+                if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
                     RenderMode::Sdf3D
                 } else {
                     RenderMode::Procedural2D
@@ -542,6 +542,14 @@ impl App {
                         }
                     }
                     self.last_mouse_pos = Some(position);
+                }
+                WindowEvent::DroppedFile(path) => {
+                    let path_str = path.to_string_lossy().to_string();
+                    tracing::info!("File dropped: {}", path_str);
+                    self.ui.queue_file(path_str);
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
                 }
                 WindowEvent::RedrawRequested => {
                     if self.window.is_some() && self.renderer.is_some() {

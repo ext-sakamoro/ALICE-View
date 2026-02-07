@@ -136,13 +136,18 @@ impl Ui {
         self.file_info_open = !self.file_info_open;
     }
 
+    /// Queue a file path for loading (used by drag-and-drop)
+    pub fn queue_file(&self, path: String) {
+        let _ = self.file_loader_tx.send(path);
+    }
+
     /// Open file dialog asynchronously (non-blocking)
     fn open_file_dialog(&self) {
         let tx = self.file_loader_tx.clone();
         thread::spawn(move || {
             // Runs in background - UI continues rendering at full speed
             if let Some(path) = rfd::FileDialog::new()
-                .add_filter("ALICE SDF", &["asdf"])
+                .add_filter("ALICE SDF", &["asdf", "json"])
                 .add_filter("ALICE Files", &["alz", "alice", "asp"])
                 .add_filter("Images", &["png", "jpg", "jpeg", "bmp"])
                 .add_filter("All Files", &["*"])
