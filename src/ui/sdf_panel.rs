@@ -4,6 +4,7 @@
 //! Author: Moroya Sakamoto
 
 use crate::app::{Camera3D, RenderMode, ViewerState};
+use super::export::ExportFormat;
 use egui::{Context, Ui};
 use glam::Vec3;
 
@@ -55,16 +56,16 @@ impl SdfScene {
 
 /// SDF Panel state
 pub struct SdfPanel {
-    /// Panel open state
-    pub open: bool,
     /// Current scene
     pub scene: SdfScene,
-    /// Camera preset
-    camera_preset: usize,
     /// Whether dynamic SDF is available
     has_dynamic_sdf: bool,
     /// Loaded .asdf file info
     loaded_asdf_info: Option<String>,
+    /// Export mesh resolution
+    pub export_resolution: u32,
+    /// Pending export request
+    pub pending_export: Option<ExportFormat>,
 }
 
 impl Default for SdfPanel {
@@ -76,11 +77,11 @@ impl Default for SdfPanel {
 impl SdfPanel {
     pub fn new() -> Self {
         Self {
-            open: true, // Open by default in 3D mode
             scene: SdfScene::default(),
-            camera_preset: 0,
             has_dynamic_sdf: false,
             loaded_asdf_info: None,
+            export_resolution: 64,
+            pending_export: None,
         }
     }
 
@@ -89,14 +90,8 @@ impl SdfPanel {
         self.has_dynamic_sdf = available;
         self.loaded_asdf_info = info;
         if available {
-            // Auto-switch to loaded SDF
             self.scene = SdfScene::LoadedAsdf;
         }
-    }
-
-    /// Check if dynamic SDF is available
-    pub fn has_dynamic_sdf(&self) -> bool {
-        self.has_dynamic_sdf
     }
 
     /// Render the SDF control panel
@@ -106,7 +101,7 @@ impl SdfPanel {
         }
 
         egui::SidePanel::left("sdf_panel")
-            .default_width(250.0)
+            .default_width(260.0)
             .resizable(true)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
@@ -121,13 +116,12 @@ impl SdfPanel {
 
         // Scene Selection
         ui.collapsing("Scene", |ui| {
-            // Show loaded .asdf first if available
             if self.has_dynamic_sdf {
                 ui.label(egui::RichText::new("Loaded SDF").strong().color(egui::Color32::from_rgb(100, 255, 100)));
                 let label = if let Some(ref info) = self.loaded_asdf_info {
-                    format!("📦 {}", info)
+                    format!("  {}", info)
                 } else {
-                    "📦 Loaded .asdf".to_string()
+                    "  Loaded .asdf".to_string()
                 };
                 if ui.selectable_label(self.scene == SdfScene::LoadedAsdf, label).clicked() {
                     self.scene = SdfScene::LoadedAsdf;
@@ -147,38 +141,22 @@ impl SdfPanel {
 
         // Camera Controls
         ui.collapsing("Camera", |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Position:");
-            });
-
             let mut pos = state.camera.position;
             ui.horizontal(|ui| {
                 ui.label("X:");
                 ui.add(egui::DragValue::new(&mut pos.x).speed(0.1).clamp_range(-50.0..=50.0));
-            });
-            ui.horizontal(|ui| {
                 ui.label("Y:");
                 ui.add(egui::DragValue::new(&mut pos.y).speed(0.1).clamp_range(-50.0..=50.0));
-            });
-            ui.horizontal(|ui| {
                 ui.label("Z:");
                 ui.add(egui::DragValue::new(&mut pos.z).speed(0.1).clamp_range(-50.0..=50.0));
             });
             state.camera.position = pos;
 
-            ui.add_space(4.0);
-
-            // FOV slider
             let mut fov_deg = state.camera.fov.to_degrees();
-            ui.horizontal(|ui| {
-                ui.label("FOV:");
-                ui.add(egui::Slider::new(&mut fov_deg, 20.0..=120.0).suffix("°"));
-            });
+            ui.add(egui::Slider::new(&mut fov_deg, 20.0..=120.0).text("FOV").suffix("°"));
             state.camera.fov = fov_deg.to_radians();
 
             ui.add_space(4.0);
-
-            // Camera presets
             ui.horizontal(|ui| {
                 if ui.button("Front").clicked() {
                     state.camera = Camera3D {
@@ -201,25 +179,56 @@ impl SdfPanel {
                         ..state.camera.clone()
                     };
                 }
-            });
-
-            ui.horizontal(|ui| {
                 if ui.button("Reset").clicked() {
                     state.camera = Camera3D::default();
                 }
-                if ui.button("Close").clicked() {
-                    state.camera = Camera3D {
-                        position: Vec3::new(0.0, 0.0, 2.0),
-                        target: Vec3::ZERO,
-                        ..state.camera.clone()
-                    };
+            });
+        });
+
+        ui.add_space(8.0);
+
+        // Lighting Controls
+        ui.collapsing("Lighting", |ui| {
+            ui.add(egui::Slider::new(&mut state.light_dir[0], -1.0..=1.0).text("Light X"));
+            ui.add(egui::Slider::new(&mut state.light_dir[1], -1.0..=1.0).text("Light Y"));
+            ui.add(egui::Slider::new(&mut state.light_dir[2], -1.0..=1.0).text("Light Z"));
+            ui.add(egui::Slider::new(&mut state.light_intensity, 0.0..=3.0).text("Intensity"));
+            ui.add(egui::Slider::new(&mut state.ambient_intensity, 0.0..=1.0).text("Ambient"));
+
+            ui.add_space(4.0);
+            ui.label("Background");
+            let mut color = egui::Color32::from_rgb(
+                (state.bg_color[0] * 255.0) as u8,
+                (state.bg_color[1] * 255.0) as u8,
+                (state.bg_color[2] * 255.0) as u8,
+            );
+            if ui.color_edit_button_srgba(&mut color).changed() {
+                state.bg_color = [
+                    color.r() as f32 / 255.0,
+                    color.g() as f32 / 255.0,
+                    color.b() as f32 / 255.0,
+                ];
+            }
+
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                if ui.button("Sunset").clicked() {
+                    state.light_dir = [0.8, 0.2, 0.3];
+                    state.light_intensity = 1.5;
+                    state.ambient_intensity = 0.1;
+                    state.bg_color = [0.05, 0.02, 0.02];
                 }
-                if ui.button("Far").clicked() {
-                    state.camera = Camera3D {
-                        position: Vec3::new(0.0, 0.0, 10.0),
-                        target: Vec3::ZERO,
-                        ..state.camera.clone()
-                    };
+                if ui.button("Studio").clicked() {
+                    state.light_dir = [0.5, 1.0, 0.3];
+                    state.light_intensity = 1.0;
+                    state.ambient_intensity = 0.15;
+                    state.bg_color = [0.02, 0.02, 0.05];
+                }
+                if ui.button("Flat").clicked() {
+                    state.light_dir = [0.0, 1.0, 0.0];
+                    state.light_intensity = 0.8;
+                    state.ambient_intensity = 0.4;
+                    state.bg_color = [0.1, 0.1, 0.1];
                 }
             });
         });
@@ -228,19 +237,12 @@ impl SdfPanel {
 
         // Raymarching Settings
         ui.collapsing("Raymarching", |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Max Steps:");
-                ui.add(egui::Slider::new(&mut state.sdf_max_steps, 16..=512));
-            });
+            ui.add(egui::Slider::new(&mut state.sdf_max_steps, 16..=512).text("Max Steps"));
 
-            // Epsilon with logarithmic scale
             let mut epsilon_log = state.sdf_epsilon.log10();
-            ui.horizontal(|ui| {
-                ui.label("Epsilon:");
-                ui.add(egui::Slider::new(&mut epsilon_log, -5.0..=-1.0));
-            });
+            ui.add(egui::Slider::new(&mut epsilon_log, -5.0..=-1.0).text("Epsilon"));
             state.sdf_epsilon = 10.0_f32.powf(epsilon_log);
-            ui.label(format!("  = {:.6}", state.sdf_epsilon));
+            ui.label(egui::RichText::new(format!("  = {:.6}", state.sdf_epsilon)).small().weak());
         });
 
         ui.add_space(8.0);
@@ -253,36 +255,61 @@ impl SdfPanel {
 
         ui.add_space(8.0);
 
-        // Keyboard shortcuts help
-        ui.collapsing("Shortcuts", |ui| {
-            ui.label("WASD - Move camera");
-            ui.label("QE - Up/Down");
-            ui.label("Mouse drag - Orbit");
-            ui.label("Scroll - Dolly");
-            ui.label("R - Reset camera");
-            ui.label("M - Toggle 2D/3D");
-            ui.label("N - Toggle normals");
-            ui.label("O - Toggle AO");
+        // Actions
+        ui.collapsing("Actions", |ui| {
+            if ui.button("Screenshot (F12)").clicked() {
+                state.screenshot_requested = true;
+            }
+
+            if self.has_dynamic_sdf {
+                ui.separator();
+                ui.label(egui::RichText::new("Export Mesh").strong());
+                ui.add(egui::Slider::new(&mut self.export_resolution, 16..=256).text("Resolution"));
+
+                ui.horizontal(|ui| {
+                    if ui.button("Export GLB").clicked() {
+                        self.pending_export = Some(ExportFormat::Glb);
+                    }
+                    if ui.button("Export OBJ").clicked() {
+                        self.pending_export = Some(ExportFormat::Obj);
+                    }
+                });
+            }
         });
 
         ui.add_space(8.0);
 
-        // Mode indicator
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.label("Mode:");
-            ui.label(egui::RichText::new("3D SDF").color(egui::Color32::from_rgb(100, 200, 255)));
+        // Shortcuts
+        ui.collapsing("Shortcuts", |ui| {
+            let shortcuts = [
+                ("WASD", "Move camera"),
+                ("QE", "Up / Down"),
+                ("Drag", "Orbit"),
+                ("Scroll", "Dolly"),
+                ("R", "Reset camera"),
+                ("M", "Toggle 2D/3D"),
+                ("N", "Toggle normals"),
+                ("O", "Toggle AO"),
+                ("F12", "Screenshot"),
+                ("F11", "Fullscreen"),
+            ];
+            for (key, desc) in shortcuts {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(key).strong().monospace());
+                    ui.label(desc);
+                });
+            }
         });
 
-        // Scene info
+        // Bottom info
+        ui.separator();
         ui.horizontal(|ui| {
-            ui.label("Scene:");
+            ui.label(egui::RichText::new("3D SDF").color(egui::Color32::from_rgb(100, 200, 255)));
+            ui.separator();
             ui.label(egui::RichText::new(self.scene.name()).strong());
         });
 
-        // Performance hint
         if state.sdf_max_steps > 256 {
-            ui.add_space(4.0);
             ui.label(
                 egui::RichText::new("High step count may reduce FPS")
                     .color(egui::Color32::YELLOW)

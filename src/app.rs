@@ -144,6 +144,46 @@ pub struct ViewerState {
     pub sdf_epsilon: f32,
     pub sdf_show_normals: bool,
     pub sdf_ambient_occlusion: bool,
+
+    // Lighting
+    pub light_dir: [f32; 3],
+    pub light_intensity: f32,
+    pub ambient_intensity: f32,
+    pub bg_color: [f32; 3],
+
+    // Screenshot request
+    pub screenshot_requested: bool,
+}
+
+impl ViewerState {
+    pub fn new(render_mode: RenderMode, show_stats: bool) -> Self {
+        Self {
+            zoom: 1.0,
+            pan: [0.0, 0.0],
+            camera: Camera3D::default(),
+            render_mode,
+            xray_mode: false,
+            xray_type: XRayType::default(),
+            show_stats,
+            paused: false,
+            stats: FrameStats {
+                fps: 0.0,
+                decode_speed: 0.0,
+                compression_ratio: 1.0,
+                gpu_usage: 0.0,
+                resolution: "∞ (Procedural)".to_string(),
+            },
+            sdf_max_steps: 128,
+            sdf_epsilon: 0.001,
+            sdf_show_normals: false,
+            sdf_ambient_occlusion: true,
+            light_dir: [0.5, 1.0, 0.3],
+            light_intensity: 1.0,
+            ambient_intensity: 0.15,
+            bg_color: [0.02, 0.02, 0.05],
+            screenshot_requested: false,
+        }
+    }
 }
 
 /// X-Ray visualization types
@@ -226,27 +266,7 @@ impl App {
             renderer: None,
             ui: Ui::new(),
             decoder: Decoder::new(),
-            state: ViewerState {
-                zoom: 1.0,
-                pan: [0.0, 0.0],
-                camera: Camera3D::default(),
-                render_mode,
-                xray_mode: false,
-                xray_type: XRayType::default(),
-                show_stats: false,
-                paused: false,
-                stats: FrameStats {
-                    fps: 0.0,
-                    decode_speed: 0.0,
-                    compression_ratio: 1.0,
-                    gpu_usage: 0.0,
-                    resolution: "∞ (Procedural)".to_string(),
-                },
-                sdf_max_steps: 128,
-                sdf_epsilon: 0.001,
-                sdf_show_normals: false,
-                sdf_ambient_occlusion: true,
-            },
+            state: ViewerState::new(render_mode, false),
             initial_file,
             mouse_pressed: false,
             last_mouse_pos: None,
@@ -272,27 +292,7 @@ impl App {
             renderer: None,
             ui: Ui::new(),
             decoder: Decoder::new(),
-            state: ViewerState {
-                zoom: config.initial_zoom,
-                pan: config.initial_pan,
-                camera: Camera3D::default(),
-                render_mode,
-                xray_mode: config.xray_mode,
-                xray_type: config.xray_type,
-                show_stats: config.show_stats,
-                paused: config.paused,
-                stats: FrameStats {
-                    fps: 0.0,
-                    decode_speed: 0.0,
-                    compression_ratio: 1.0,
-                    gpu_usage: 0.0,
-                    resolution: "∞ (Procedural)".to_string(),
-                },
-                sdf_max_steps: 128,
-                sdf_epsilon: 0.001,
-                sdf_show_normals: false,
-                sdf_ambient_occlusion: true,
-            },
+            state: ViewerState::new(render_mode, config.show_stats),
             initial_file: config.initial_file.clone(),
             mouse_pressed: false,
             last_mouse_pos: None,
@@ -426,6 +426,10 @@ impl App {
                     tracing::info!("Fullscreen toggled");
                 }
             }
+            KeyCode::F12 => {
+                self.state.screenshot_requested = true;
+                tracing::info!("Screenshot requested");
+            }
             KeyCode::Space => {
                 self.state.paused = !self.state.paused;
                 tracing::info!("Paused: {}", self.state.paused);
@@ -558,13 +562,20 @@ impl App {
                         let renderer = self.renderer.as_mut().unwrap();
 
                         // Check for pending WGSL shader from loaded .asdf file
-                        // and rebuild the SDF pipeline with dynamic shader
                         if let Some(wgsl) = self.ui.take_pending_wgsl() {
                             renderer.rebuild_sdf_pipeline_with_wgsl(&wgsl);
                         }
 
                         if let Err(e) = renderer.render(&mut self.state, &self.decoder, &mut self.ui) {
                             tracing::error!("Render error: {}", e);
+                        }
+
+                        // Handle screenshot after render
+                        if self.state.screenshot_requested {
+                            self.state.screenshot_requested = false;
+                            if let Err(e) = renderer.capture_screenshot() {
+                                tracing::error!("Screenshot failed: {}", e);
+                            }
                         }
 
                         if !self.state.paused {

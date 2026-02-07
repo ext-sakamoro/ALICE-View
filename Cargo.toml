@@ -1,13 +1,14 @@
 [package]
 name = "alice-view"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Moroya Sakamoto"]
 description = "The Infinite Canvas - Real-time procedural rendering engine for ALICE ecosystem"
 license = "MIT"
 repository = "https://github.com/ext-sakamoro/ALICE-View"
-keywords = ["visualization", "procedural", "wgpu", "alice", "compression"]
+keywords = ["visualization", "procedural", "wgpu", "alice", "sdf"]
 categories = ["graphics", "visualization", "multimedia"]
+default-run = "alice-view"
 
 [dependencies]
 # Performance
@@ -25,7 +26,7 @@ egui-wgpu = "0.27"
 egui-winit = "0.27"
 
 # Math & Procedural (SIMD optimized)
-glam = { version = "0.25", features = ["bytemuck", "serde"] }
+glam = { version = "0.29", features = ["bytemuck", "serde"] }
 noise = "0.9"
 
 # ALICE-SDF Integration (3D raymarching with WGSL transpiler)
@@ -36,10 +37,12 @@ anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-image = "0.24"
+image = { version = "0.24", features = ["png", "jpeg"] }
 rfd = "0.14"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+dirs = "5"
+chrono = "0.4"
 
 # Async
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }

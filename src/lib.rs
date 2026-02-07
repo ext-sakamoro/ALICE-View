@@ -115,4 +115,13 @@ impl ViewerConfig {
             ..Default::default()
         }
     }
+
+    /// Create config for viewing an SDF file
+    pub fn for_sdf_file(path: &str) -> Self {
+        Self {
+            title: format!("ALICE-View - {}", std::path::Path::new(path).file_name().unwrap_or_default().to_string_lossy()),
+            initial_file: Some(path.to_string()),
+            ..Default::default()
+        }
+    }
 }

@@ -13,6 +13,7 @@ use anyhow::Result;
 use std::sync::Arc;
 use wgpu::*;
 use winit::{dpi::PhysicalSize, window::Window};
+use image::RgbaImage;
 
 /// Main renderer
 pub struct Renderer {
@@ -145,6 +146,100 @@ impl Renderer {
     /// Check if dynamic SDF is currently loaded
     pub fn has_dynamic_sdf(&self) -> bool {
         self.sdf_pipeline.has_dynamic_sdf()
+    }
+
+    /// Capture screenshot of the current frame
+    pub fn capture_screenshot(&self) -> Result<()> {
+        let width = self.size.width;
+        let height = self.size.height;
+
+        // Create a texture to copy into
+        let texture = self.device.create_texture(&TextureDescriptor {
+            label: Some("Screenshot Texture"),
+            size: Extent3d { width, height, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: self.config.format,
+            usage: TextureUsages::COPY_DST | TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+
+        let bytes_per_pixel = 4u32;
+        let unpadded_bytes_per_row = width * bytes_per_pixel;
+        let align = COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) / align * align;
+
+        let buffer = self.device.create_buffer(&BufferDescriptor {
+            label: Some("Screenshot Buffer"),
+            size: (padded_bytes_per_row * height) as u64,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        // Get current surface texture and copy
+        let output = self.surface.get_current_texture()?;
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("Screenshot Encoder"),
+        });
+
+        encoder.copy_texture_to_buffer(
+            ImageCopyTexture {
+                texture: &output.texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: TextureAspect::All,
+            },
+            ImageCopyBuffer {
+                buffer: &buffer,
+                layout: ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            Extent3d { width, height, depth_or_array_layers: 1 },
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Read buffer
+        let buffer_slice = buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        buffer_slice.map_async(MapMode::Read, move |result| {
+            let _ = tx.send(result);
+        });
+        self.device.poll(Maintain::Wait);
+        rx.recv()??;
+
+        let data = buffer_slice.get_mapped_range();
+
+        // Remove padding
+        let mut pixels = Vec::with_capacity((width * height * bytes_per_pixel) as usize);
+        for row in 0..height {
+            let start = (row * padded_bytes_per_row) as usize;
+            let end = start + (width * bytes_per_pixel) as usize;
+            pixels.extend_from_slice(&data[start..end]);
+        }
+        drop(data);
+        buffer.unmap();
+        output.present();
+
+        // Save to file
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("alice-view_{}.png", timestamp);
+
+        // Try Desktop, then current dir
+        let save_path = dirs::desktop_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(&filename);
+
+        if let Some(img) = RgbaImage::from_raw(width, height, pixels) {
+            img.save(&save_path)?;
+            tracing::info!("Screenshot saved: {}", save_path.display());
+        }
+
+        Ok(())
     }
 
     pub fn render(&mut self, state: &mut ViewerState, decoder: &Decoder, ui: &mut Ui) -> Result<()> {

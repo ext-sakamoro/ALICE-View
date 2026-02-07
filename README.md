@@ -5,7 +5,7 @@
 <h1 align="center">ALICE-View</h1>
 
 <p align="center">
-  <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.1.0-blue.svg" alt="Version"></a>
+  <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.2.0-blue.svg" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.75+-orange.svg" alt="Rust"></a>
 </p>
@@ -13,88 +13,53 @@
 > **The Infinite Canvas**
 > *Render the Math. See beyond the Pixels.*
 
-ALICE-View is the official high-performance visualizer for the ALICE ecosystem (`.alz`, `.asp`).
-It is not just a media player; it is a **real-time procedural rendering engine** powered by Rust and wgpu.
-
-## Why ALICE-View?
-
-Traditional players display static grids of pixels. ALICE-View **solves equations** 60 times per second to generate visuals.
-
-| Traditional Player | ALICE-View |
-|-------------------|------------|
-| Displays pre-rendered pixels | Renders math in real-time |
-| Fixed resolution | **Infinite resolution** |
-| Zoom = pixelation | Zoom = recalculation |
-| "What you see is what you get" | "What you see is computed" |
-
-## Philosophy
-
-```
-"Don't just watch the video. Watch the math."
-```
-
-ALICE-View completes the ALICE ecosystem:
-
-```
-[Compress]      [Stream]       [Store]        [View]
- ALICE-Zip  →    ASP      →   ALICE-DB   →  ALICE-View
-   (Math)      (Protocol)     (Model)       (Render)
-```
+ALICE-View is a high-performance real-time 3D SDF visualizer and procedural rendering engine for the ALICE ecosystem. Powered by Rust, wgpu, and [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF).
 
 ## Features
 
-### 🔍 Infinite Zoom
+### 3D SDF Raymarching
 
-Experience the power of Procedural Compression. Since the data is stored as mathematical descriptions (fractals, curves, gradients), you can zoom indefinitely without quality loss.
+Real-time GPU raymarching of SDF (Signed Distance Function) models via WGSL shaders transpiled by ALICE-SDF.
 
-```
-Zoom: 1x      →     100x      →     10,000x
-[Sharp]           [Sharp]           [Still Sharp!]
-```
+- Load `.json`, `.asdf`, `.asdf.json` SDF files
+- Drag & drop files onto the window
+- Orbit camera with mouse, WASD movement
+- Adjustable lighting (direction, intensity, ambient, background color)
+- Lighting presets (Sunset, Studio, Flat)
+- Raymarching controls (max steps, epsilon)
+- Normal visualization and ambient occlusion toggle
 
-The GPU recalculates the equations at each zoom level, providing infinite detail.
+### Mesh Export
 
-### ⚡ X-Ray Debugging Mode
+Export loaded SDF models to standard 3D formats via ALICE-SDF's Marching Cubes mesher:
 
-Press `F1` to toggle X-Ray Mode and see the underlying mathematics:
+| Format | Description |
+|--------|-------------|
+| `.glb` | glTF 2.0 Binary (recommended) |
+| `.obj` | Wavefront OBJ |
+
+Adjustable export resolution (16-256).
+
+### Screenshot
+
+Press `F12` to capture a PNG screenshot (saved to Desktop).
+
+### Infinite Zoom (Procedural 2D)
+
+For procedural content (`.alz`, `.asp`), zoom indefinitely without quality loss. The GPU recalculates equations at each zoom level.
+
+### X-Ray Debugging Mode
+
+Press `F1` to toggle X-Ray Mode:
 
 | Mode | Description |
 |------|-------------|
 | **Motion Vectors** | Visualize ASP streaming flow |
 | **FFT Heatmap** | See the frequency domain |
-| **Equation Overlay** | Display active polynomial/noise parameters |
+| **Equation Overlay** | Display active parameters |
 | **Wireframe** | Show procedural mesh structure |
 
-### 📊 Real-time Benchmark
-
-Press `F2` to show performance overlay:
-
-```
-┌─────────────────────────────────┐
-│ FPS: 144 | GPU: 12%             │
-│ Decode: 2.4 GB/s                │
-│ Compression: 1,450x             │
-│ Resolution: ∞ (Procedural)      │
-└─────────────────────────────────┘
-```
-
-### 🚀 Universal Format Support
-
-| Format | Type | Notes |
-|--------|------|-------|
-| `.alz` | ALICE-Zip Archive | Full procedural support |
-| `.asp` | ALICE Streaming | Real-time network streaming |
-| `.alice-db` | ALICE Database | Time-series visualization |
-| `.png`, `.jpg` | Standard Images | Fallback raster mode |
-| `.mp4`, `.webm` | Standard Video | Fallback video mode |
-
 ## Installation
-
-### From Cargo
-
-```bash
-cargo install alice-view
-```
 
 ### From Source
 
@@ -102,97 +67,160 @@ cargo install alice-view
 git clone https://github.com/ext-sakamoro/ALICE-View.git
 cd ALICE-View
 cargo build --release
-./target/release/alice-view
+```
+
+The binary is at `target/release/alice-view`.
+
+### Install to PATH
+
+```bash
+cargo install --path .
 ```
 
 ## Usage
 
-### Open a file
+### Open an SDF file
 
 ```bash
-alice-view path/to/file.alz
+alice-view model.json
+alice-view scene.asdf
 ```
 
-### Stream from network
+### Reopen last file
 
 ```bash
-alice-view asp://stream.example.com:8080
+alice-view --last
 ```
 
 ### Interactive mode
 
 ```bash
 alice-view
-# Then drag & drop files or use File → Open
+# Drag & drop files or use File > Open
+```
+
+### Options
+
+```
+alice-view [OPTIONS] [FILE]
+
+Arguments:
+  [FILE]         SDF file to open (.json, .asdf, .asdf.json)
+
+Options:
+  --last         Reopen last opened file
+  --width <N>    Window width (default: 1280)
+  --height <N>   Window height (default: 720)
+  --stats        Show performance stats on startup
+  --help, -h     Show help
+  --version, -V  Show version
 ```
 
 ## Controls
 
+### 3D Mode (SDF)
+
 | Key | Action |
 |-----|--------|
-| `Scroll` | Zoom in/out (Infinite on procedural content) |
-| `Click + Drag` | Pan viewport |
-| `Space` | Pause/Play |
-| `F1` | Toggle X-Ray / Debug Overlay |
-| `F2` | Show Performance Stats |
-| `F11` | Toggle Fullscreen |
-| `Ctrl+O` | Open File |
-| `Esc` | Exit |
+| `WASD` | Move camera |
+| `Q / E` | Camera up / down |
+| `Mouse drag` | Orbit camera |
+| `Scroll` | Dolly (zoom) |
+| `R` | Reset camera |
+| `N` | Toggle normal visualization |
+| `O` | Toggle ambient occlusion |
+| `M` | Toggle 2D/3D mode |
+
+### General
+
+| Key | Action |
+|-----|--------|
+| `F1` | Toggle X-Ray mode |
+| `F2` | Toggle performance stats |
+| `F3` | Toggle file info panel |
+| `F11` | Toggle fullscreen |
+| `F12` | Screenshot (PNG) |
+| `Space` | Pause / Play |
+
+## Supported Formats
+
+| Format | Type | Mode |
+|--------|------|------|
+| `.json` | SDF JSON (ALICE-SDF) | 3D Raymarching |
+| `.asdf` | ALICE-SDF Binary | 3D Raymarching |
+| `.asdf.json` | ALICE-SDF JSON | 3D Raymarching |
+| `.alz` / `.alice` | ALICE-Zip Archive | 2D Procedural |
+| `.asp` | ALICE Streaming | 2D Procedural |
+| `.png`, `.jpg` | Standard Images | Raster fallback |
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                       ALICE-View v0.2.0                      │
+├──────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐  │
+│  │   Decoder    │  │   Renderer    │  │       UI         │  │
+│  │  asdf/alice  │──│  wgpu + WGSL  │──│  egui panels     │  │
+│  └──────────────┘  └───────────────┘  └──────────────────┘  │
+│         │                  │                    │            │
+│         ▼                  ▼                    ▼            │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │              ALICE-SDF Integration                  │     │
+│  │  SdfTree → WgslShader (transpile) → GPU Raymarch   │     │
+│  │  SdfTree → MarchingCubes → GLB/OBJ Export          │     │
+│  └────────────────────────────────────────────────────┘     │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │              GPU Shaders (WGSL)                     │     │
+│  │  raymarching.wgsl | procedural.wgsl                 │     │
+│  │  + dynamic SDF shaders (transpiled at runtime)      │     │
+│  └────────────────────────────────────────────────────┘     │
+└──────────────────────────────────────────────────────────────┘
+```
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | **Language** | Rust |
-| **Graphics** | wgpu (WebGPU ecosystem) |
-| **UI** | egui (Immediate Mode GUI) |
-| **Math** | glam + noise |
-| **Engine** | libalice + libasp |
+| **Graphics** | wgpu (WebGPU) |
+| **SDF Engine** | [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF) |
+| **UI** | egui |
+| **Math** | glam |
+| **Allocator** | mimalloc |
 
-### Why wgpu?
+## Library Usage
 
-wgpu provides a unified API across:
-- **Metal** (macOS/iOS)
-- **Vulkan** (Linux/Android/Windows)
-- **DirectX 12** (Windows)
-- **WebGPU** (Browser)
+```rust
+use alice_view::{ViewerConfig, launch_viewer};
 
-One codebase, maximum performance everywhere.
+// Launch with default settings
+launch_viewer(ViewerConfig::default()).unwrap();
 
-## Architecture
+// Launch with SDF file
+launch_viewer(ViewerConfig::for_sdf_file("model.json")).unwrap();
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                      ALICE-View                             │
-├────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │   Decoder    │  │   Renderer   │  │       UI         │  │
-│  │  (alz/asp)   │──│    (wgpu)    │──│     (egui)       │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-│         │                 │                   │            │
-│         ▼                 ▼                   ▼            │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                  Math Engine                         │   │
-│  │  Polynomial | Fourier | Perlin | Sine | Fractal     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                          │                                 │
-│                          ▼                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                  GPU Shaders                         │   │
-│  │  procedural.wgsl | xray.wgsl | composite.wgsl       │   │
-│  └─────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────┘
+// Custom configuration
+launch_viewer(ViewerConfig {
+    title: "My Viewer".to_string(),
+    width: 1920,
+    height: 1080,
+    show_stats: true,
+    ..Default::default()
+}).unwrap();
 ```
 
 ## Related Projects
 
 | Project | Description |
 |---------|-------------|
+| [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF) | SDF library with 36 primitives, SIMD eval, mesh export, WGSL/HLSL/GLSL transpilers |
 | [ALICE-Zip](https://github.com/ext-sakamoro/ALICE-Zip) | Core procedural compression engine |
 | [ALICE-DB](https://github.com/ext-sakamoro/ALICE-DB) | Model-based time-series database |
 | [ALICE-Edge](https://github.com/ext-sakamoro/ALICE-Edge) | Embedded/IoT model generator (no_std) |
 | [ALICE-Streaming-Protocol](https://github.com/ext-sakamoro/ALICE-Streaming-Protocol) | Ultra-low bandwidth video streaming |
-| [ALICE-Eco-System](https://github.com/ext-sakamoro/ALICE-Eco-System) | Complete Edge-to-Cloud pipeline demo |
 
 ## License
 

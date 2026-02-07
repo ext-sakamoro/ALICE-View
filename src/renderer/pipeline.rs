@@ -187,9 +187,13 @@ pub struct SdfUniforms {
 
     // Scene selection (16 bytes for alignment)
     scene_id: u32,          // offset 80
-    _pad1: u32,             // offset 84
-    _pad2: u32,             // offset 88
+    light_intensity: f32,   // offset 84
+    ambient_intensity: f32, // offset 88
     _pad3: u32,             // offset 92
+
+    // Lighting direction + bg color (32 bytes)
+    light_dir: [f32; 4],    // offset 96  (xyz = dir, w = unused)
+    bg_color: [f32; 4],     // offset 112 (xyz = color, w = unused)
 }
 
 /// Base shader template for raymarching
@@ -400,9 +404,12 @@ impl SdfPipeline {
             flags,
 
             scene_id,
-            _pad1: 0,
-            _pad2: 0,
+            light_intensity: state.light_intensity,
+            ambient_intensity: state.ambient_intensity,
             _pad3: 0,
+
+            light_dir: [state.light_dir[0], state.light_dir[1], state.light_dir[2], 0.0],
+            bg_color: [state.bg_color[0], state.bg_color[1], state.bg_color[2], 1.0],
         };
 
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));

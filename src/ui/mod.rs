@@ -9,12 +9,14 @@ mod xray;
 mod stats;
 pub mod file_info;
 pub mod sdf_panel;
+pub mod export;
 
 pub use viewport::*;
 pub use xray::*;
 pub use stats::*;
 pub use file_info::*;
 pub use sdf_panel::*;
+pub use export::*;
 
 use crate::app::{RenderMode, ViewerState, XRayType};
 use crate::decoder::Decoder;
@@ -41,11 +43,17 @@ pub struct Ui {
     sdf_panel: SdfPanel,
     /// Pending WGSL shader for pipeline rebuild (set when .asdf is loaded)
     pending_wgsl: Option<String>,
+    /// Export status channel
+    export_status_rx: Receiver<ExportStatus>,
+    export_status_tx: Sender<ExportStatus>,
+    /// Last export status message
+    export_message: Option<(ExportStatus, std::time::Instant)>,
 }
 
 impl Ui {
     pub fn new() -> Self {
         let (tx, rx) = channel();
+        let (etx, erx) = channel();
         Self {
             about_open: false,
             file_info_open: false,
@@ -55,6 +63,9 @@ impl Ui {
             current_file_info: None,
             sdf_panel: SdfPanel::new(),
             pending_wgsl: None,
+            export_status_rx: erx,
+            export_status_tx: etx,
+            export_message: None,
         }
     }
 
@@ -76,11 +87,44 @@ impl Ui {
         }
     }
 
+    /// Start mesh export
+    pub fn start_export(&self, decoder: &Decoder, format: ExportFormat, resolution: u32) {
+        if let Some(sdf_content) = decoder.sdf_content() {
+            export::export_mesh(sdf_content, format, resolution, self.export_status_tx.clone());
+        }
+    }
+
     /// Update UI state & Logic (non-blocking)
     pub fn update(&mut self, state: &mut ViewerState, decoder: &mut Decoder) {
         // Record frame time (O(1) ring buffer update)
         self.stats_collector.record_frame();
         state.stats.fps = self.stats_collector.fps();
+
+        // Check export status
+        while let Ok(status) = self.export_status_rx.try_recv() {
+            match &status {
+                ExportStatus::Done(msg) | ExportStatus::Error(msg) => {
+                    tracing::info!("Export: {}", msg);
+                }
+                ExportStatus::Started(msg) | ExportStatus::Progress(msg) => {
+                    tracing::info!("Export: {}", msg);
+                }
+            }
+            self.export_message = Some((status, std::time::Instant::now()));
+        }
+
+        // Clear old export messages after 5 seconds
+        if let Some((_, timestamp)) = &self.export_message {
+            if timestamp.elapsed().as_secs() > 5 {
+                self.export_message = None;
+            }
+        }
+
+        // Check for pending export request from SDF panel
+        if let Some(format) = self.sdf_panel.pending_export.take() {
+            let resolution = self.sdf_panel.export_resolution;
+            self.start_export(decoder, format, resolution);
+        }
 
         // Check for loaded files from background thread (non-blocking)
         while let Ok(path) = self.file_loader_rx.try_recv() {
@@ -167,12 +211,17 @@ impl Ui {
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("📂 Open... (Ctrl+O)").clicked() {
-                        self.open_file_dialog(); // Non-blocking
+                    if ui.button("Open... (Ctrl+O)").clicked() {
+                        self.open_file_dialog();
                         ui.close_menu();
                     }
                     ui.separator();
-                    if ui.button("❌ Exit").clicked() {
+                    if ui.button("Screenshot (F12)").clicked() {
+                        state.screenshot_requested = true;
+                        ui.close_menu();
+                    }
+                    ui.separator();
+                    if ui.button("Exit").clicked() {
                         std::process::exit(0);
                     }
                 });
@@ -310,7 +359,9 @@ impl Ui {
                         ui.label(egui::RichText::new("The Infinite Canvas").italics());
                         ui.add_space(10.0);
                         ui.label(format!("v{}", env!("CARGO_PKG_VERSION")));
-                        ui.label("Powered by Rust + wgpu + mimalloc");
+                        ui.label("Powered by Rust + wgpu + ALICE-SDF + mimalloc");
+                        ui.add_space(5.0);
+                        ui.label("Author: Moroya Sakamoto");
                         ui.add_space(10.0);
                         ui.label(egui::RichText::new("\"See the Math. Not the Pixels.\"").italics());
                         ui.add_space(10.0);
@@ -321,6 +372,20 @@ impl Ui {
                         }
                     });
                 });
+        }
+
+        // 6. Export status toast
+        if let Some((ref status, _)) = self.export_message {
+            let (msg, color) = match status {
+                ExportStatus::Done(m) => (m.as_str(), egui::Color32::GREEN),
+                ExportStatus::Error(m) => (m.as_str(), egui::Color32::RED),
+                ExportStatus::Started(m) | ExportStatus::Progress(m) => (m.as_str(), egui::Color32::YELLOW),
+            };
+            egui::TopBottomPanel::bottom("export_status").show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(msg).color(color));
+                });
+            });
         }
 
         // End frame and return output
