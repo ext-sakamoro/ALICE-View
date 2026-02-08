@@ -212,6 +212,19 @@ launch_viewer(ViewerConfig {
 }).unwrap();
 ```
 
+## Cross-Crate Bridges
+
+ALICE-View connects to other ALICE ecosystem crates via feature-gated bridge modules:
+
+| Bridge | Feature | Target Crate | Description |
+|--------|---------|--------------|-------------|
+| `analytics_bridge` | `analytics` | [ALICE-Analytics](../ALICE-Analytics) | Real-time rendering performance analytics |
+| `physics_bridge` | `physics` | [ALICE-Physics](../ALICE-Physics) | Interactive physics debug overlay visualization |
+
+### Cargo Profile
+
+Standardized `[profile.bench]` added for consistent benchmarking across ALICE crates.
+
 ## Related Projects
 
 | Project | Description |

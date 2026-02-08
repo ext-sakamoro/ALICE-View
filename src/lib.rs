@@ -25,6 +25,10 @@ pub mod app;
 pub mod decoder;
 pub mod renderer;
 pub mod ui;
+#[cfg(feature = "analytics")]
+pub mod analytics_bridge;
+#[cfg(feature = "physics")]
+pub mod physics_bridge;
 
 use anyhow::Result;
 use winit::event_loop::{ControlFlow, EventLoop};

@@ -47,6 +47,15 @@ chrono = "0.4"
 # Async
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
+# ALICE ecosystem bridges (optional)
+alice-analytics = { path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
+alice-physics = { path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
+
+[features]
+default = []
+analytics = ["dep:alice-analytics"]  # Rendering performance metrics (DDSketch)
+physics = ["dep:alice-physics"]      # Interactive physics visualization
+
 [profile.release]
 opt-level = 3
 lto = "fat"
@@ -65,3 +74,9 @@ path = "src/main.rs"
 [[bin]]
 name = "alice-create"
 path = "src/bin/alice-create.rs"
+
+[profile.bench]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false
