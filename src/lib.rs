@@ -29,6 +29,8 @@ pub mod ui;
 pub mod analytics_bridge;
 #[cfg(feature = "physics")]
 pub mod physics_bridge;
+#[cfg(feature = "db")]
+pub mod db_bridge;
 
 use anyhow::Result;
 use winit::event_loop::{ControlFlow, EventLoop};

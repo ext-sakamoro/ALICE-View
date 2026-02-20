@@ -32,6 +32,9 @@ noise = "0.9"
 # ALICE-SDF Integration (3D raymarching with WGSL transpiler)
 alice-sdf = { path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
 
+# Logging
+log = "0.4"
+
 # Utilities
 anyhow = "1.0"
 thiserror = "1.0"
@@ -50,11 +53,13 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 # ALICE ecosystem bridges (optional)
 alice-analytics = { path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
 alice-physics = { path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
+alice-db = { path = "../ALICE-DB", optional = true, default-features = false }
 
 [features]
 default = []
 analytics = ["dep:alice-analytics"]  # Rendering performance metrics (DDSketch)
 physics = ["dep:alice-physics"]      # Interactive physics visualization
+db = ["dep:alice-db"]                # Time-series DB query → plot data
 
 [profile.release]
 opt-level = 3
@@ -74,6 +79,9 @@ path = "src/main.rs"
 [[bin]]
 name = "alice-create"
 path = "src/bin/alice-create.rs"
+
+[dev-dependencies]
+tempfile = "3.10"
 
 [profile.bench]
 opt-level = 3
