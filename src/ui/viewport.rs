@@ -27,8 +27,9 @@ impl ViewportState {
     /// Handle drag update
     pub fn update_drag(&mut self, pos: [f32; 2], zoom: f32) -> Option<[f32; 2]> {
         self.drag_start.map(|start| {
-            let delta_x = (pos[0] - start[0]) / zoom;
-            let delta_y = (pos[1] - start[1]) / zoom;
+            let zoom_rcp = 1.0 / zoom;
+            let delta_x = (pos[0] - start[0]) * zoom_rcp;
+            let delta_y = (pos[1] - start[1]) * zoom_rcp;
             [
                 self.initial_pan[0] + delta_x,
                 self.initial_pan[1] + delta_y,

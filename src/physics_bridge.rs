@@ -33,7 +33,8 @@ pub fn extract_render_bodies(world: &PhysicsWorld) -> Vec<RenderBody> {
 
         let speed = (vx * vx + vy * vy + vz * vz).sqrt();
         let (dx, dy, dz) = if speed > 1e-6 {
-            (vx / speed, vy / speed, vz / speed)
+            let speed_rcp = 1.0 / speed;
+            (vx * speed_rcp, vy * speed_rcp, vz * speed_rcp)
         } else {
             (0.0, 0.0, 0.0)
         };

@@ -45,23 +45,27 @@ impl Default for Camera3D {
 
 impl Camera3D {
     /// Get view direction (normalized)
+    #[inline(always)]
     pub fn forward(&self) -> Vec3 {
         (self.target - self.position).normalize()
     }
 
     /// Get right vector (normalized)
+    #[inline(always)]
     pub fn right(&self) -> Vec3 {
         self.forward().cross(self.up).normalize()
     }
 
     /// Orbit around target (spherical coordinates)
+    #[inline(always)]
     pub fn orbit(&mut self, delta_theta: f32, delta_phi: f32) {
         let radius = (self.position - self.target).length();
         let offset = self.position - self.target;
 
         // Current spherical coordinates
         let mut theta = offset.z.atan2(offset.x);
-        let mut phi = (offset.y / radius).acos();
+        let radius_rcp = 1.0 / radius;
+        let mut phi = (offset.y * radius_rcp).acos();
 
         // Apply rotation
         theta += delta_theta;
@@ -76,6 +80,7 @@ impl Camera3D {
     }
 
     /// Dolly (move along view direction)
+    #[inline(always)]
     pub fn dolly(&mut self, distance: f32) {
         let direction = self.forward();
         self.position += direction * distance;
@@ -87,6 +92,7 @@ impl Camera3D {
     }
 
     /// Pan (move camera and target together)
+    #[inline(always)]
     pub fn pan(&mut self, delta_x: f32, delta_y: f32) {
         let right = self.right();
         let up = self.up;

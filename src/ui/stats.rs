@@ -3,6 +3,8 @@
 //! Displays real-time metrics with micro-graphs using ring buffers
 //! to avoid per-frame memory allocation.
 
+const MS_SCALE_RCP: f32 = 1.0 / 33.3;
+
 use crate::app::ViewerState;
 use egui::epaint::PathShape;
 use egui::{Color32, Pos2, Stroke};
@@ -52,7 +54,8 @@ impl StatsCollector {
     pub fn fps(&self) -> f32 {
         let avg_ms = self.total_time / self.frame_times.len() as f32;
         if avg_ms > 0.001 {
-            1000.0 / avg_ms
+            let avg_ms_rcp = 1.0 / avg_ms;
+            1000.0 * avg_ms_rcp
         } else {
             0.0
         }
@@ -104,7 +107,7 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
 
                         let x = rect.min.x + (i as f32 / history_len as f32) * rect.width();
                         // Scale: 0ms = bottom, 33ms (30fps) = top
-                        let h = (ms / 33.3).min(1.0);
+                            let h = (ms * MS_SCALE_RCP).min(1.0);
                         let y = rect.max.y - h * rect.height();
 
                         collector.graph_points_buffer.push(Pos2::new(x, y));
@@ -118,14 +121,14 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                     }
 
                     // Target line (16.6ms / 60fps)
-                    let target_y = rect.max.y - (16.6 / 33.3) * rect.height();
+                    let target_y = rect.max.y - (16.6 * MS_SCALE_RCP) * rect.height();
                     ui.painter().line_segment(
                         [Pos2::new(rect.min.x, target_y), Pos2::new(rect.max.x, target_y)],
                         Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 50)),
                     );
 
                     // 30fps warning line
-                    let warn_y = rect.max.y - (33.3 / 33.3) * rect.height();
+                    let warn_y = rect.max.y - 1.0 * rect.height();
                     ui.painter().line_segment(
                         [Pos2::new(rect.min.x, warn_y), Pos2::new(rect.max.x, warn_y)],
                         Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 100, 100, 50)),

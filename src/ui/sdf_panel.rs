@@ -3,6 +3,8 @@
 //! Interactive controls for 3D SDF visualization.
 //! Author: Moroya Sakamoto
 
+const RGB_RCP: f32 = 1.0 / 255.0;
+
 use crate::app::{Camera3D, RenderMode, ViewerState};
 use super::export::ExportFormat;
 use egui::{Context, Ui};
@@ -204,9 +206,9 @@ impl SdfPanel {
             );
             if ui.color_edit_button_srgba(&mut color).changed() {
                 state.bg_color = [
-                    color.r() as f32 / 255.0,
-                    color.g() as f32 / 255.0,
-                    color.b() as f32 / 255.0,
+                    color.r() as f32 * RGB_RCP,
+                    color.g() as f32 * RGB_RCP,
+                    color.b() as f32 * RGB_RCP,
                 ];
             }
 

@@ -155,6 +155,8 @@ impl AliceHeader {
     }
 }
 
+const Q16_RCP: f32 = 1.0 / 65536.0;
+
 /// Linear model payload: y = slope * x + intercept (Q16.16 fixed point)
 #[derive(Debug, Clone)]
 pub struct LinearPayload {
@@ -190,12 +192,14 @@ impl LinearPayload {
     }
 
     /// Convert Q16.16 to float
+    #[inline(always)]
     pub fn slope_f32(&self) -> f32 {
-        self.slope_q16 as f32 / 65536.0
+        self.slope_q16 as f32 * Q16_RCP
     }
 
+    #[inline(always)]
     pub fn intercept_f32(&self) -> f32 {
-        self.intercept_q16 as f32 / 65536.0
+        self.intercept_q16 as f32 * Q16_RCP
     }
 
     /// Get human-readable equation string
@@ -215,10 +219,11 @@ impl LinearPayload {
     }
 
     /// Evaluate at point x
+    #[inline(always)]
     pub fn evaluate(&self, x: i32) -> f32 {
         let mx = (self.slope_q16 as i64).wrapping_mul(x as i64);
         let q16_val = (mx as i32).wrapping_add(self.intercept_q16);
-        q16_val as f32 / 65536.0
+        q16_val as f32 * Q16_RCP
     }
 
     /// Serialize to bytes
