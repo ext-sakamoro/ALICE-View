@@ -335,6 +335,7 @@ impl Decoder {
         let compressed_size = metadata.len();
 
         // TODO: Implement actual ASP parsing
+        log::warn!("ASP stream parsing not yet implemented — returning placeholder Perlin content");
         let content = ProceduralContent::Perlin {
             seed: 12345,
             scale: 5.0,

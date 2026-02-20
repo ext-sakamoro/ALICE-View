@@ -94,6 +94,7 @@ impl AspStreamState {
 
     /// Process incoming packet
     pub fn process_packet(&mut self, _data: &[u8]) -> Result<(), &'static str> {
+        log::warn!("process_packet() is a stub — ASP packet processing not yet implemented");
         // TODO: Implement actual packet processing
         Ok(())
     }

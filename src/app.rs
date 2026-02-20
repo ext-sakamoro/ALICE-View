@@ -315,7 +315,7 @@ impl App {
         );
 
         // Initialize renderer
-        self.renderer = Some(pollster::block_on(Renderer::new(window.clone())).unwrap());
+        self.renderer = Some(pollster::block_on(Renderer::new(window.clone())).expect("Failed to initialize GPU renderer — no suitable adapter found"));
 
         // Load initial file
         if let Some(path) = self.initial_file.take() {
@@ -559,7 +559,7 @@ impl App {
                     if self.window.is_some() && self.renderer.is_some() {
                         self.ui.update(&mut self.state, &mut self.decoder);
 
-                        let renderer = self.renderer.as_mut().unwrap();
+                        let renderer = self.renderer.as_mut().expect("renderer must be initialized before draw");
 
                         // Check for pending WGSL shader from loaded .asdf file
                         if let Some(wgsl) = self.ui.take_pending_wgsl() {
