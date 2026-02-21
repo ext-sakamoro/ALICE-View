@@ -11,6 +11,9 @@ pub mod file_info;
 pub mod sdf_panel;
 pub mod export;
 
+// viewport and xray exports are public API; items may be unused within this
+// crate's binary but are available to external embedders.
+#[allow(unused_imports)]
 pub use viewport::*;
 pub use xray::*;
 pub use stats::*;
@@ -75,6 +78,8 @@ impl Ui {
     }
 
     /// Get current file info
+    // Available for external embedders that render file info in their own UI.
+    #[allow(dead_code)]
     pub fn file_info(&self) -> Option<&FileInfo> {
         self.current_file_info.as_ref()
     }

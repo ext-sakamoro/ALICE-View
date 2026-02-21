@@ -25,6 +25,9 @@ pub struct Camera3D {
     /// Field of view in radians
     pub fov: f32,
     /// Near clipping plane
+    // Stored for potential depth buffer configuration; not currently wired to
+    // the raymarcher which uses epsilon-based termination instead.
+    #[allow(dead_code)]
     pub near: f32,
     /// Far clipping plane (max raymarch distance)
     pub far: f32,
@@ -208,11 +211,16 @@ pub struct FrameStats {
     pub fps: f32,
     pub decode_speed: f64,
     pub compression_ratio: f32,
+    // Reserved for future GPU query integration (wgpu timestamp queries).
+    #[allow(dead_code)]
     pub gpu_usage: f32,
     pub resolution: String,
 }
 
 /// Viewer configuration for library usage
+// Fields are part of the public library API; not all are consumed by the
+// binary target but are used by external embedders via with_config().
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ViewerConfig {
     /// Window title
@@ -255,6 +263,9 @@ impl Default for ViewerConfig {
 }
 
 impl App {
+    // App::new is the public library entry point; the binary uses with_config()
+    // but external embedders call new() directly.
+    #[allow(dead_code)]
     pub fn new(initial_file: Option<String>) -> Self {
         // Auto-detect render mode from file extension
         let render_mode = initial_file.as_ref()

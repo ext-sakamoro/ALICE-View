@@ -19,6 +19,8 @@ pub struct SdfContent {
     /// Bounding box (computed from SDF)
     pub bounds: (Vec3, Vec3),
     /// File format version
+    // Stored for future version-gated feature selection.
+    #[allow(dead_code)]
     pub version: String,
 }
 
@@ -100,6 +102,8 @@ impl SdfContent {
     }
 
     /// Get the SDF root node
+    // Available for external consumers that need direct tree access.
+    #[allow(dead_code)]
     pub fn root(&self) -> &SdfNode {
         &self.tree.root
     }
@@ -120,6 +124,8 @@ impl SdfContent {
     }
 
     /// Get the raw WGSL source with metadata
+    // Returns (source, node_count, helper_count) for detailed inspection.
+    #[allow(dead_code)]
     pub fn to_wgsl_with_metadata(&self) -> (String, usize, usize) {
         let shader = WgslShader::transpile(&self.tree.root, TranspileMode::Hardcoded);
         (shader.source, self.node_count, shader.helper_count)
@@ -127,6 +133,8 @@ impl SdfContent {
 }
 
 /// Check if a file is an ASDF/SDF JSON file
+// Used by file-dialog filters in external consumers.
+#[allow(dead_code)]
 pub fn is_asdf_file(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json") || path_str.ends_with(".json")

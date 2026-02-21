@@ -9,9 +9,15 @@ pub mod asdf;
 mod alz;
 mod asp;
 
+// Re-export format modules so crate consumers can use types without full paths.
+// Some items are unused within this crate but form the public protocol API.
+#[allow(unused_imports)]
 pub use alice::*;
+#[allow(unused_imports)]
 pub use alz::*;
+#[allow(unused_imports)]
 pub use asdf::*;
+#[allow(unused_imports)]
 pub use asp::*;
 
 use anyhow::{Context, Result};
@@ -21,6 +27,9 @@ use std::sync::Arc;
 use tokio::fs;
 
 /// Content type
+// Video variant is defined for completeness; actual video decoding is not yet
+// implemented but the variant is required for format compatibility.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentType {
     /// No content loaded
@@ -38,6 +47,9 @@ pub enum ContentType {
 }
 
 /// Decoded procedural content
+// Polynomial/SineWave/Fourier variants are defined for future format support.
+// Fields inside Perlin/Fractal/Raster are used by the shader pipeline indirectly.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ProceduralContent {
     /// Perlin noise parameters
@@ -101,6 +113,9 @@ pub struct Decoder {
     sdf_content: Option<asdf::SdfContent>,
 }
 
+// Several Decoder methods are public API for library consumers even if not
+// called within this crate's binary targets.
+#[allow(dead_code)]
 impl Decoder {
     pub fn new() -> Self {
         Self {

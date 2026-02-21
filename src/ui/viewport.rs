@@ -1,5 +1,9 @@
 //! Main viewport rendering
 
+// ViewportState and render_viewport_info are complete drag/overlay utilities
+// to be integrated once the egui viewport panel is wired up.
+#![allow(dead_code)]
+
 use crate::app::ViewerState;
 
 /// Viewport state

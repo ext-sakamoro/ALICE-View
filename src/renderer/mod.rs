@@ -4,6 +4,8 @@ mod pipeline;
 mod infinite_zoom;
 
 pub use pipeline::*;
+// infinite_zoom exports are public API for external consumers.
+#[allow(unused_imports)]
 pub use infinite_zoom::*;
 
 use crate::app::{RenderMode, ViewerState};
@@ -27,6 +29,9 @@ pub struct Renderer {
     // 3D SDF raymarching pipeline
     sdf_pipeline: SdfPipeline,
     egui_renderer: egui_wgpu::Renderer,
+    // egui_winit::State must be kept alive for correct input handling even
+    // though we process events at the App level.
+    #[allow(dead_code)]
     egui_state: egui_winit::State,
     egui_ctx: egui::Context,
     start_time: std::time::Instant,
@@ -144,6 +149,8 @@ impl Renderer {
     }
 
     /// Check if dynamic SDF is currently loaded
+    // Available for external library consumers and future UI status indicators.
+    #[allow(dead_code)]
     pub fn has_dynamic_sdf(&self) -> bool {
         self.sdf_pipeline.has_dynamic_sdf()
     }
@@ -154,7 +161,7 @@ impl Renderer {
         let height = self.size.height;
 
         // Create a texture to copy into
-        let texture = self.device.create_texture(&TextureDescriptor {
+        let _texture = self.device.create_texture(&TextureDescriptor {
             label: Some("Screenshot Texture"),
             size: Extent3d { width, height, depth_or_array_layers: 1 },
             mip_level_count: 1,
@@ -168,7 +175,7 @@ impl Renderer {
         let bytes_per_pixel = 4u32;
         let unpadded_bytes_per_row = width * bytes_per_pixel;
         let align = COPY_BYTES_PER_ROW_ALIGNMENT;
-        let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) / align * align;
+        let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
 
         let buffer = self.device.create_buffer(&BufferDescriptor {
             label: Some("Screenshot Buffer"),

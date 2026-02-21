@@ -137,6 +137,8 @@ pub fn render_xray_overlay(ctx: &egui::Context, state: &ViewerState) {
 }
 
 /// X-Ray color scheme
+// Defined for use by future shader uniform upload when X-Ray is wired to GPU.
+#[allow(dead_code)]
 pub struct XRayColors {
     pub motion_positive: [f32; 3],
     pub motion_negative: [f32; 3],

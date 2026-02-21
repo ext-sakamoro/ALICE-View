@@ -1,5 +1,10 @@
 //! ALICE-Zip (.alz) decoder
 
+// AlzHeader, AlzContentType and their methods are the public ALZ wire format
+// API. Not all are instantiated within this crate but are required for
+// external ALZ stream consumers.
+#![allow(dead_code)]
+
 /// ALICE-Zip file header
 #[repr(C)]
 pub struct AlzHeader {

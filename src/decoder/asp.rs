@@ -1,5 +1,9 @@
 //! ALICE Streaming Protocol (.asp) decoder
 
+// ASP structs and enums define the streaming wire protocol.
+// Full decoding is not yet implemented; types are stubs for future work.
+#![allow(dead_code)]
+
 /// ASP packet types
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

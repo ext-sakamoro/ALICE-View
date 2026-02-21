@@ -4,6 +4,10 @@
 //! we can zoom indefinitely without quality loss. This module handles
 //! LOD (Level of Detail) calculations for infinite zoom.
 
+// LodLevel, Precision, InfiniteZoomManager and helper functions are a complete
+// LOD subsystem that will be wired into the shader pipeline in a future pass.
+#![allow(dead_code)]
+
 /// LOD level based on zoom factor
 #[derive(Debug, Clone, Copy)]
 pub struct LodLevel {

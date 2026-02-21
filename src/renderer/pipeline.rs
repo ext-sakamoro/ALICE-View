@@ -1,12 +1,14 @@
 //! Procedural rendering pipeline
 
-use crate::app::{RenderMode, ViewerState};
+use crate::app::ViewerState;
 use crate::decoder::Decoder;
 use wgpu::*;
 
 /// Procedural rendering pipeline
 pub struct ProceduralPipeline {
     render_pipeline: RenderPipeline,
+    // Stored to allow future dynamic bind group rebuilds (e.g. texture updates).
+    #[allow(dead_code)]
     bind_group_layout: BindGroupLayout,
     uniform_buffer: Buffer,
     bind_group: BindGroup,
@@ -200,16 +202,23 @@ pub struct SdfUniforms {
 const RAYMARCHING_TEMPLATE: &str = include_str!("../shaders/raymarching.wgsl");
 
 /// Dynamic SDF placeholder in shader template
+// Used conceptually to document the replacement pattern; actual replacement
+// uses the full multi-line string literal in rebuild_with_dynamic_sdf().
+#[allow(dead_code)]
 const DYNAMIC_SDF_PLACEHOLDER: &str = "// {{DYNAMIC_SDF_FUNCTION}}";
 
 /// SDF Raymarching pipeline with dynamic shader support
 pub struct SdfPipeline {
     render_pipeline: RenderPipeline,
+    // Stored to allow future dynamic bind group rebuilds.
+    #[allow(dead_code)]
     bind_group_layout: BindGroupLayout,
     uniform_buffer: Buffer,
     bind_group: BindGroup,
     format: TextureFormat,
     /// Whether dynamic SDF is currently loaded
+    // Exposed via has_dynamic_sdf() for renderer-level queries.
+    #[allow(dead_code)]
     has_dynamic_sdf: bool,
 }
 
@@ -360,6 +369,8 @@ impl SdfPipeline {
     }
 
     /// Check if dynamic SDF is loaded
+    // Called by Renderer::has_dynamic_sdf() for external queries.
+    #[allow(dead_code)]
     pub fn has_dynamic_sdf(&self) -> bool {
         self.has_dynamic_sdf
     }

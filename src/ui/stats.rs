@@ -61,7 +61,9 @@ impl StatsCollector {
         }
     }
 
-    /// Get capacity
+    /// Get capacity of the ring buffer
+    // Available for external UI components that want to render a fixed-size graph.
+    #[allow(dead_code)]
     pub fn capacity(&self) -> usize {
         self.frame_times.len()
     }

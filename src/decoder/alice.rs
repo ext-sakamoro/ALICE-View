@@ -22,12 +22,12 @@
 //! ```
 
 use anyhow::{bail, Context, Result};
-use std::io::{Cursor, Read};
 
 /// ALICE file magic bytes
 pub const ALICE_MAGIC: &[u8; 5] = b"ALICE";
 
 /// Current format version
+#[allow(dead_code)] // Used in AliceFileBuilder::build() for file format versioning
 pub const ALICE_VERSION: u8 = 1;
 
 /// Content types stored in .alice files
@@ -93,6 +93,11 @@ pub struct AliceHeader {
     pub metadata_length: u32,
 }
 
+
+// AliceHeader fields (magic, version, flags) are used in to_bytes() and by
+// alice-create binary. Clippy flags them because derived Clone/Debug are
+// excluded from dead-code analysis.
+#[allow(dead_code)]
 impl AliceHeader {
     pub const SIZE: usize = 32;
 
@@ -168,6 +173,8 @@ pub struct LinearPayload {
     pub sample_count: u32,
 }
 
+// LinearPayload serialization methods are used by alice-create binary.
+#[allow(dead_code)]
 impl LinearPayload {
     pub const SIZE: usize = 12;
 
@@ -246,6 +253,8 @@ pub struct PerlinPayload {
     pub lacunarity: f32,
 }
 
+// PerlinPayload serialization used by alice-create binary.
+#[allow(dead_code)]
 impl PerlinPayload {
     pub const SIZE: usize = 24;
 
@@ -294,6 +303,8 @@ pub struct FractalPayload {
     pub julia_cy: f64,
 }
 
+// FractalPayload serialization used by alice-create binary.
+#[allow(dead_code)]
 impl FractalPayload {
     pub const SIZE: usize = 45;
 
@@ -394,6 +405,8 @@ pub struct AliceMetadata {
     pub custom: Option<String>,
 }
 
+// AliceMetadata serialization used by alice-create binary.
+#[allow(dead_code)]
 impl AliceMetadata {
     /// Parse from JSON bytes
     pub fn parse(data: &[u8]) -> Result<Self> {
@@ -472,6 +485,8 @@ pub struct AliceFile {
     pub metadata: AliceMetadata,
 }
 
+// AliceFile::to_bytes is used by alice-create binary.
+#[allow(dead_code)]
 impl AliceFile {
     /// Parse .alice file from bytes
     pub fn parse(data: &[u8]) -> Result<Self> {
@@ -543,6 +558,8 @@ impl AliceFile {
 }
 
 /// Builder for creating .alice files
+// Used exclusively by alice-create binary.
+#[allow(dead_code)]
 pub struct AliceFileBuilder {
     content_type: AliceContentType,
     original_size: u64,
@@ -550,6 +567,7 @@ pub struct AliceFileBuilder {
     metadata: AliceMetadata,
 }
 
+#[allow(dead_code)]
 impl AliceFileBuilder {
     pub fn new(content_type: AliceContentType) -> Self {
         Self {

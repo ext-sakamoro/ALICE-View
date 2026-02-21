@@ -8,7 +8,6 @@
 
 use alice_view::decoder::alice::*;
 use std::fs;
-use std::io::Write;
 
 fn print_usage() {
     println!("ALICE File Creator");

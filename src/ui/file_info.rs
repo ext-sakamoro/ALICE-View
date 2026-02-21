@@ -238,6 +238,8 @@ fn format_bytes(bytes: u64) -> String {
 }
 
 /// Compact file info for status bar
+// Alternative to the full side-panel; used when screen real estate is limited.
+#[allow(dead_code)]
 pub fn render_compact_info(ui: &mut Ui, info: &FileInfo) {
     ui.horizontal(|ui| {
         // Type badge
