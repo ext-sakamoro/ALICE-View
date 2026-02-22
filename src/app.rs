@@ -75,11 +75,12 @@ impl Camera3D {
         phi = (phi + delta_phi).clamp(0.01, std::f32::consts::PI - 0.01);
 
         // Convert back to Cartesian
-        self.position = self.target + Vec3::new(
-            radius * phi.sin() * theta.cos(),
-            radius * phi.cos(),
-            radius * phi.sin() * theta.sin(),
-        );
+        self.position = self.target
+            + Vec3::new(
+                radius * phi.sin() * theta.cos(),
+                radius * phi.cos(),
+                radius * phi.sin() * theta.sin(),
+            );
     }
 
     /// Dolly (move along view direction)
@@ -262,13 +263,61 @@ impl Default for ViewerConfig {
     }
 }
 
+#[allow(dead_code)] // Public library API — unused by the binary
+impl ViewerConfig {
+    /// Create config for displaying temperature data visualization
+    pub fn for_temperature_data() -> Self {
+        Self {
+            title: "ALICE-View - Temperature Visualization".to_string(),
+            show_stats: true,
+            ..Default::default()
+        }
+    }
+
+    /// Create config for fractal exploration
+    pub fn for_fractal() -> Self {
+        Self {
+            title: "ALICE-View - Fractal Explorer".to_string(),
+            initial_zoom: 1.0,
+            initial_pan: [-0.5, 0.0],
+            ..Default::default()
+        }
+    }
+
+    /// Create minimal viewer for embedding
+    pub fn minimal() -> Self {
+        Self {
+            title: "ALICE-View".to_string(),
+            width: 800,
+            height: 600,
+            ..Default::default()
+        }
+    }
+
+    /// Create config for viewing an SDF file
+    pub fn for_sdf_file(path: &str) -> Self {
+        Self {
+            title: format!(
+                "ALICE-View - {}",
+                std::path::Path::new(path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+            ),
+            initial_file: Some(path.to_string()),
+            ..Default::default()
+        }
+    }
+}
+
 impl App {
     // App::new is the public library entry point; the binary uses with_config()
     // but external embedders call new() directly.
     #[allow(dead_code)]
     pub fn new(initial_file: Option<String>) -> Self {
         // Auto-detect render mode from file extension
-        let render_mode = initial_file.as_ref()
+        let render_mode = initial_file
+            .as_ref()
             .map(|f| {
                 if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
                     RenderMode::Sdf3D
@@ -294,7 +343,9 @@ impl App {
     /// Create App with custom configuration (for library usage)
     pub fn with_config(config: ViewerConfig) -> Self {
         // Auto-detect render mode from file extension
-        let render_mode = config.initial_file.as_ref()
+        let render_mode = config
+            .initial_file
+            .as_ref()
             .map(|f| {
                 if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
                     RenderMode::Sdf3D
@@ -328,11 +379,14 @@ impl App {
                 .with_title(&self.config.title)
                 .with_inner_size(PhysicalSize::new(self.config.width, self.config.height))
                 .build(target)
-                .unwrap()
+                .unwrap(),
         );
 
         // Initialize renderer
-        self.renderer = Some(pollster::block_on(Renderer::new(window.clone())).expect("Failed to initialize GPU renderer — no suitable adapter found"));
+        self.renderer = Some(
+            pollster::block_on(Renderer::new(window.clone()))
+                .expect("Failed to initialize GPU renderer — no suitable adapter found"),
+        );
 
         // Load initial file
         if let Some(path) = self.initial_file.take() {
@@ -487,7 +541,13 @@ impl App {
     /// Main event handling logic (winit 0.29 style)
     pub fn handle_event(&mut self, event: Event<()>, target: &EventLoopWindowTarget<()>) {
         // Handle UI events first
-        if let (Some(renderer), Event::WindowEvent { event: ref w_event, .. }) = (&mut self.renderer, &event) {
+        if let (
+            Some(renderer),
+            Event::WindowEvent {
+                event: ref w_event, ..
+            },
+        ) = (&mut self.renderer, &event)
+        {
             let response = self.ui.handle_event(w_event, renderer.egui_ctx());
             if response.consumed {
                 return;
@@ -506,11 +566,12 @@ impl App {
                     }
                 }
                 WindowEvent::KeyboardInput {
-                    event: KeyEvent {
-                        physical_key: PhysicalKey::Code(key),
-                        state,
-                        ..
-                    },
+                    event:
+                        KeyEvent {
+                            physical_key: PhysicalKey::Code(key),
+                            state,
+                            ..
+                        },
                     ..
                 } => {
                     self.handle_key(key, state == ElementState::Pressed);
@@ -530,7 +591,11 @@ impl App {
                     }
                 }
                 // Mouse button press/release
-                WindowEvent::MouseInput { state, button: winit::event::MouseButton::Left, .. } => {
+                WindowEvent::MouseInput {
+                    state,
+                    button: winit::event::MouseButton::Left,
+                    ..
+                } => {
                     self.mouse_pressed = state == ElementState::Pressed;
                 }
                 // Mouse movement (drag to pan/orbit)
@@ -550,10 +615,9 @@ impl App {
                                 RenderMode::Sdf3D => {
                                     // 3D: Orbit camera around target
                                     let orbit_sensitivity = 0.01;
-                                    self.state.camera.orbit(
-                                        -dx * orbit_sensitivity,
-                                        dy * orbit_sensitivity,
-                                    );
+                                    self.state
+                                        .camera
+                                        .orbit(-dx * orbit_sensitivity, dy * orbit_sensitivity);
                                 }
                             }
 
@@ -576,14 +640,19 @@ impl App {
                     if self.window.is_some() && self.renderer.is_some() {
                         self.ui.update(&mut self.state, &mut self.decoder);
 
-                        let renderer = self.renderer.as_mut().expect("renderer must be initialized before draw");
+                        let renderer = self
+                            .renderer
+                            .as_mut()
+                            .expect("renderer must be initialized before draw");
 
                         // Check for pending WGSL shader from loaded .asdf file
                         if let Some(wgsl) = self.ui.take_pending_wgsl() {
                             renderer.rebuild_sdf_pipeline_with_wgsl(&wgsl);
                         }
 
-                        if let Err(e) = renderer.render(&mut self.state, &self.decoder, &mut self.ui) {
+                        if let Err(e) =
+                            renderer.render(&mut self.state, &self.decoder, &mut self.ui)
+                        {
                             tracing::error!("Render error: {}", e);
                         }
 
@@ -606,5 +675,162 @@ impl App {
             },
             _ => {}
         }
+    }
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec3;
+
+    // ── Camera3D ────────────────────────────────────────────────────
+
+    #[test]
+    fn camera_default_position() {
+        let cam = Camera3D::default();
+        assert_eq!(cam.position, Vec3::new(0.0, 0.0, 5.0));
+        assert_eq!(cam.target, Vec3::ZERO);
+        assert_eq!(cam.up, Vec3::Y);
+    }
+
+    #[test]
+    fn camera_forward_direction() {
+        let cam = Camera3D::default();
+        let fwd = cam.forward();
+        // Default camera looks from (0,0,5) toward (0,0,0) → forward = -Z
+        assert!((fwd.x).abs() < 1e-5);
+        assert!((fwd.y).abs() < 1e-5);
+        assert!(fwd.z < 0.0);
+        assert!((fwd.length() - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn camera_right_vector() {
+        let cam = Camera3D::default();
+        let right = cam.right();
+        // forward = -Z, up = Y → right = X
+        assert!(right.x > 0.0);
+        assert!((right.y).abs() < 1e-5);
+        assert!((right.z).abs() < 1e-5);
+        assert!((right.length() - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn camera_dolly_moves_position() {
+        let mut cam = Camera3D::default();
+        let pos_before = cam.position;
+        cam.dolly(1.0);
+        assert!(cam.position.z < pos_before.z);
+    }
+
+    #[test]
+    fn camera_dolly_min_distance() {
+        let mut cam = Camera3D::default();
+        cam.dolly(100.0);
+        let dist = (cam.target - cam.position).length();
+        assert!(dist >= 0.4, "Distance {} too small", dist);
+    }
+
+    #[test]
+    fn camera_pan_moves_both() {
+        let mut cam = Camera3D::default();
+        let pos_before = cam.position;
+        let target_before = cam.target;
+        cam.pan(1.0, 0.0);
+        let pos_delta = cam.position - pos_before;
+        let target_delta = cam.target - target_before;
+        assert!((pos_delta - target_delta).length() < 1e-5);
+    }
+
+    #[test]
+    fn camera_orbit_preserves_distance() {
+        let mut cam = Camera3D::default();
+        let dist_before = (cam.position - cam.target).length();
+        cam.orbit(0.3, 0.2);
+        let dist_after = (cam.position - cam.target).length();
+        assert!(
+            (dist_before - dist_after).abs() < 1e-4,
+            "Distance changed: {} -> {}",
+            dist_before,
+            dist_after
+        );
+    }
+
+    #[test]
+    fn camera_orbit_changes_position() {
+        let mut cam = Camera3D::default();
+        let pos_before = cam.position;
+        cam.orbit(0.5, 0.0);
+        let moved = (cam.position - pos_before).length();
+        assert!(moved > 0.01, "Camera didn't move: delta={}", moved);
+    }
+
+    // ── ViewerConfig ────────────────────────────────────────────────
+
+    #[test]
+    fn config_default_values() {
+        let cfg = ViewerConfig::default();
+        assert_eq!(cfg.width, 1280);
+        assert_eq!(cfg.height, 720);
+        assert!((cfg.initial_zoom - 1.0).abs() < 1e-10);
+        assert!(!cfg.show_stats);
+        assert!(!cfg.xray_mode);
+        assert!(cfg.initial_file.is_none());
+    }
+
+    #[test]
+    fn config_for_fractal() {
+        let cfg = ViewerConfig::for_fractal();
+        assert!((cfg.initial_zoom - 1.0).abs() < 1e-10);
+        assert!((cfg.initial_pan[0] - (-0.5)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn config_minimal() {
+        let cfg = ViewerConfig::minimal();
+        assert_eq!(cfg.width, 800);
+        assert_eq!(cfg.height, 600);
+    }
+
+    #[test]
+    fn config_for_sdf_file() {
+        let cfg = ViewerConfig::for_sdf_file("/tmp/test.asdf");
+        assert!(cfg.title.contains("test.asdf"));
+        assert_eq!(cfg.initial_file.as_deref(), Some("/tmp/test.asdf"));
+    }
+
+    // ── ViewerState ─────────────────────────────────────────────────
+
+    #[test]
+    fn viewer_state_defaults() {
+        let state = ViewerState::new(RenderMode::Procedural2D, false);
+        assert!((state.zoom - 1.0).abs() < 1e-10);
+        assert!(!state.paused);
+        assert!(!state.xray_mode);
+        assert!(!state.show_stats);
+        assert_eq!(state.render_mode, RenderMode::Procedural2D);
+    }
+
+    #[test]
+    fn viewer_state_3d_mode() {
+        let state = ViewerState::new(RenderMode::Sdf3D, true);
+        assert_eq!(state.render_mode, RenderMode::Sdf3D);
+        assert!(state.show_stats);
+        assert_eq!(state.sdf_max_steps, 128);
+        assert!((state.sdf_epsilon - 0.001).abs() < 1e-10);
+    }
+
+    // ── RenderMode / XRayType ───────────────────────────────────────
+
+    #[test]
+    fn render_mode_default_is_2d() {
+        assert_eq!(RenderMode::default(), RenderMode::Procedural2D);
+    }
+
+    #[test]
+    fn xray_type_default_is_motion_vectors() {
+        assert_eq!(XRayType::default(), XRayType::MotionVectors);
     }
 }

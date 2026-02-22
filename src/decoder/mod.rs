@@ -2,11 +2,11 @@
 //!
 //! - Async I/O to avoid blocking UI thread
 //! - spawn_blocking for heavy image decode
-//! - Arc<Vec<u8>> for zero-copy raster data
+//! - `Arc<Vec<u8>>` for zero-copy raster data
 
 pub mod alice;
-pub mod asdf;
 mod alz;
+pub mod asdf;
 mod asp;
 
 // Re-export format modules so crate consumers can use types without full paths.
@@ -61,9 +61,7 @@ pub enum ProceduralContent {
         lacunarity: f32,
     },
     /// Polynomial coefficients
-    Polynomial {
-        coefficients: Vec<f64>,
-    },
+    Polynomial { coefficients: Vec<f64> },
     /// Sine wave parameters
     SineWave {
         frequency: f32,
@@ -143,11 +141,16 @@ impl Decoder {
     /// For async loading, use load_async() instead
     pub fn load(&mut self, path: &str) -> Result<()> {
         let p = Path::new(path);
-        let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let ext = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         let path_str_cow = p.to_string_lossy();
 
         // ASDF/SDF files: load synchronously (avoids Tokio runtime requirement)
-        if path_str_cow.ends_with(".asdf.json") || path_str_cow.ends_with(".asdf") || ext == "json" {
+        if path_str_cow.ends_with(".asdf.json") || path_str_cow.ends_with(".asdf") || ext == "json"
+        {
             return self.load_asdf_sync(path);
         }
 
@@ -236,11 +239,9 @@ impl Decoder {
         tracing::info!("Loading ASDF file: {:?}", path);
 
         // Load SDF in blocking thread (file I/O)
-        let sdf_content = tokio::task::spawn_blocking(move || {
-            asdf::SdfContent::load(&path)
-        })
-        .await
-        .context("Spawn blocking task failed")??;
+        let sdf_content = tokio::task::spawn_blocking(move || asdf::SdfContent::load(&path))
+            .await
+            .context("Spawn blocking task failed")??;
 
         // Get file size for stats
         let metadata = fs::metadata(&self.file_path.as_ref().unwrap()).await?;
@@ -267,7 +268,15 @@ impl Decoder {
     }
 
     /// Load ALICE file (Async)
-    async fn load_alice_async(path: PathBuf) -> Result<(ProceduralContent, ContentType, u64, u64, Option<alice::AliceFile>)> {
+    async fn load_alice_async(
+        path: PathBuf,
+    ) -> Result<(
+        ProceduralContent,
+        ContentType,
+        u64,
+        u64,
+        Option<alice::AliceFile>,
+    )> {
         tracing::info!("Loading ALICE file (Async): {:?}", path);
 
         // Read file contents
@@ -328,7 +337,9 @@ impl Decoder {
         }
 
         // Fallback: legacy ALZ format or demo content
-        let metadata = fs::metadata(&path).await.context("Failed to read metadata")?;
+        let metadata = fs::metadata(&path)
+            .await
+            .context("Failed to read metadata")?;
         let compressed_size = metadata.len();
 
         let content = ProceduralContent::Fractal {
@@ -339,14 +350,22 @@ impl Decoder {
             julia_c: None,
         };
 
-        Ok((content, ContentType::AliceZip, compressed_size * 500, compressed_size, None))
+        Ok((
+            content,
+            ContentType::AliceZip,
+            compressed_size * 500,
+            compressed_size,
+            None,
+        ))
     }
 
     /// Load ASP stream file (Async)
     async fn load_asp_async(path: PathBuf) -> Result<(ProceduralContent, ContentType, u64, u64)> {
         tracing::info!("Loading ASP stream (Async): {:?}", path);
 
-        let metadata = fs::metadata(&path).await.context("Failed to read metadata")?;
+        let metadata = fs::metadata(&path)
+            .await
+            .context("Failed to read metadata")?;
         let compressed_size = metadata.len();
 
         // TODO: Implement actual ASP parsing
@@ -359,7 +378,12 @@ impl Decoder {
             lacunarity: 2.0,
         };
 
-        Ok((content, ContentType::AspStream, compressed_size * 1000, compressed_size))
+        Ok((
+            content,
+            ContentType::AspStream,
+            compressed_size * 1000,
+            compressed_size,
+        ))
     }
 
     /// Load standard image (Async + spawn_blocking for heavy decode)
@@ -367,28 +391,34 @@ impl Decoder {
         tracing::info!("Loading image (Async): {:?}", path);
 
         // Offload heavy image decoding to blocking thread pool
-        let result = tokio::task::spawn_blocking(move || -> Result<(ProceduralContent, u64, u64)> {
-            let img = image::open(&path).context("Failed to open image")?;
-            let rgba = img.to_rgba8(); // Convert to RGBA for GPU upload
-            let (width, height) = rgba.dimensions();
-            let raw_data = rgba.into_raw();
-            let original_size = (width * height * 4) as u64;
-            let compressed_size = std::fs::metadata(&path)?.len();
+        let result =
+            tokio::task::spawn_blocking(move || -> Result<(ProceduralContent, u64, u64)> {
+                let img = image::open(&path).context("Failed to open image")?;
+                let rgba = img.to_rgba8(); // Convert to RGBA for GPU upload
+                let (width, height) = rgba.dimensions();
+                let raw_data = rgba.into_raw();
+                let original_size = (width * height * 4) as u64;
+                let compressed_size = std::fs::metadata(&path)?.len();
 
-            tracing::info!("Image decoded: {}x{}, {} bytes", width, height, original_size);
-
-            Ok((
-                ProceduralContent::Raster {
+                tracing::info!(
+                    "Image decoded: {}x{}, {} bytes",
                     width,
                     height,
-                    data: Arc::new(raw_data), // Zero-copy sharing
-                },
-                original_size,
-                compressed_size,
-            ))
-        })
-        .await
-        .context("Spawn blocking task failed")??;
+                    original_size
+                );
+
+                Ok((
+                    ProceduralContent::Raster {
+                        width,
+                        height,
+                        data: Arc::new(raw_data), // Zero-copy sharing
+                    },
+                    original_size,
+                    compressed_size,
+                ))
+            })
+            .await
+            .context("Spawn blocking task failed")??;
 
         Ok((result.0, ContentType::Image, result.1, result.2))
     }
@@ -433,5 +463,63 @@ impl Decoder {
 impl Default for Decoder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decoder_new_defaults() {
+        let d = Decoder::new();
+        assert_eq!(d.content_type(), ContentType::None);
+        assert!(d.content().is_none());
+        assert!(d.file_path().is_none());
+        assert!(d.sdf_content().is_none());
+        assert!(d.alice_file().is_none());
+    }
+
+    #[test]
+    fn decoder_compression_ratio_default() {
+        let d = Decoder::new();
+        assert!((d.compression_ratio() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn decoder_is_procedural_empty() {
+        let d = Decoder::new();
+        assert!(!d.is_procedural());
+    }
+
+    #[test]
+    fn content_type_variants() {
+        // Verify all variants can be created
+        let types = [
+            ContentType::None,
+            ContentType::AliceZip,
+            ContentType::AspStream,
+            ContentType::AliceSdf,
+            ContentType::Image,
+            ContentType::Video,
+        ];
+        for t in &types {
+            assert_eq!(*t, *t);
+        }
+    }
+
+    #[test]
+    fn fractal_type_variants() {
+        let types = [
+            FractalType::Mandelbrot,
+            FractalType::Julia,
+            FractalType::BurningShip,
+            FractalType::Tricorn,
+        ];
+        for t in &types {
+            assert_eq!(*t, *t);
+        }
     }
 }

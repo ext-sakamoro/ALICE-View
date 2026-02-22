@@ -15,8 +15,12 @@ fn print_usage() {
     println!();
     println!("Usage:");
     println!("  alice-create linear --slope <f32> --intercept <f32> [--samples <u32>] [-o <file>]");
-    println!("  alice-create linear-q16 --slope <i32> --intercept <i32> [--samples <u32>] [-o <file>]");
-    println!("  alice-create mandelbrot [--iterations <u32>] [--cx <f64>] [--cy <f64>] [-o <file>]");
+    println!(
+        "  alice-create linear-q16 --slope <i32> --intercept <i32> [--samples <u32>] [-o <file>]"
+    );
+    println!(
+        "  alice-create mandelbrot [--iterations <u32>] [--cx <f64>] [--cy <f64>] [-o <file>]"
+    );
     println!("  alice-create julia [--cx <f64>] [--cy <f64>] [--iterations <u32>] [-o <file>]");
     println!("  alice-create perlin [--seed <u64>] [--scale <f32>] [--octaves <u32>] [-o <file>]");
     println!("  alice-create demo [-o <file>]");
@@ -127,7 +131,11 @@ fn main() {
     }
 }
 
-fn create_linear(args: &[String], sensor_id: Option<String>, unit: Option<String>) -> anyhow::Result<AliceFile> {
+fn create_linear(
+    args: &[String],
+    sensor_id: Option<String>,
+    unit: Option<String>,
+) -> anyhow::Result<AliceFile> {
     let mut slope: f32 = 0.005;
     let mut intercept: f32 = 25.0;
     let mut samples: u32 = 1000;
@@ -166,7 +174,11 @@ fn create_linear(args: &[String], sensor_id: Option<String>, unit: Option<String
     builder.build()
 }
 
-fn create_linear_q16(args: &[String], sensor_id: Option<String>, unit: Option<String>) -> anyhow::Result<AliceFile> {
+fn create_linear_q16(
+    args: &[String],
+    sensor_id: Option<String>,
+    unit: Option<String>,
+) -> anyhow::Result<AliceFile> {
     let mut slope_q16: i32 = 32767;
     let mut intercept_q16: i32 = 163840000;
     let mut samples: u32 = 1000;
@@ -288,7 +300,7 @@ fn create_demo(sensor_id: Option<String>, unit: Option<String>) -> anyhow::Resul
     // intercept = 25.0 (base temperature)
     // samples = 1000
 
-    let slope_q16 = 32767;       // ~0.5 in Q16.16
+    let slope_q16 = 32767; // ~0.5 in Q16.16
     let intercept_q16 = 163824115; // ~2499.76 in Q16.16
 
     let mut builder = AliceFileBuilder::from_linear(slope_q16, intercept_q16, 1000);

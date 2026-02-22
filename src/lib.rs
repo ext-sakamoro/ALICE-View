@@ -1,14 +1,46 @@
-//! ALICE-View: The Infinite Canvas
+//! # ALICE-View
 //!
-//! Real-time procedural rendering engine for the ALICE ecosystem.
-//! "See the Math. Not the Pixels."
+//! Real-time SDF visualizer and procedural rendering engine for the ALICE ecosystem.
 //!
-//! # Library Usage
+//! > "See the Math. Not the Pixels."
+//!
+//! ALICE-View renders SDF scenes from [`alice_sdf`] in real time using wgpu
+//! (WebGPU). It supports both 2D procedural content (fractals, Perlin noise,
+//! sensor data) and 3D SDF raymarching with orbit camera, X-Ray overlays,
+//! and NPR shading.
+//!
+//! ## Modules
+//!
+//! | Module | Description |
+//! |--------|-------------|
+//! | [`app`] | Application state, [`Camera3D`](app::Camera3D), [`ViewerConfig`], event handling |
+//! | [`decoder`] | Format loaders: `.alice`, `.alz`, `.asdf`, `.asp`, images |
+//! | [`renderer`] | wgpu GPU renderer, WGSL shader pipelines, egui integration |
+//! | [`ui`] | egui panels: stats, viewport, X-Ray, SDF controls, file info, export |
+//!
+//! ## Feature-Gated Modules
+//!
+//! | Feature | Module | Dependency | License |
+//! |---------|--------|-----------|---------|
+//! | `analytics` | `analytics_bridge` | ALICE-Analytics | MIT |
+//! | `physics` | `physics_bridge` | ALICE-Physics | AGPL-3.0 |
+//! | `db` | `db_bridge` | ALICE-DB | Proprietary |
+//!
+//! ## Supported Formats
+//!
+//! | Extension | Type | Render Mode |
+//! |-----------|------|-------------|
+//! | `.asdf`, `.asdf.json`, `.json` | SDF scene | 3D raymarching |
+//! | `.alice` | ALICE binary | 2D procedural |
+//! | `.alz` | ALICE zip archive | 2D procedural |
+//! | `.png`, `.jpg` | Raster image | 2D raster |
+//!
+//! ## Library Usage
 //!
 //! ```rust,no_run
 //! use alice_view::{ViewerConfig, launch_viewer};
 //!
-//! // Launch with default config
+//! // Launch with default config (1280x720)
 //! launch_viewer(ViewerConfig::default()).unwrap();
 //!
 //! // Launch with custom parameters
@@ -20,17 +52,31 @@
 //!     ..Default::default()
 //! }).unwrap();
 //! ```
+//!
+//! ## Keyboard Controls
+//!
+//! | Key | Action |
+//! |-----|--------|
+//! | WASD / QE | Camera movement (3D mode) |
+//! | Mouse drag | Orbit (3D) / Pan (2D) |
+//! | Scroll | Dolly zoom |
+//! | R | Reset camera |
+//! | M | Toggle 2D/3D mode |
+//! | F1 | X-Ray overlay |
+//! | F2 | Stats overlay |
+//! | F11 | Fullscreen |
+//! | F12 | Screenshot (PNG) |
 
-pub mod app;
-pub mod decoder;
-pub mod renderer;
-pub mod ui;
 #[cfg(feature = "analytics")]
 pub mod analytics_bridge;
-#[cfg(feature = "physics")]
-pub mod physics_bridge;
+pub mod app;
 #[cfg(feature = "db")]
 pub mod db_bridge;
+pub mod decoder;
+#[cfg(feature = "physics")]
+pub mod physics_bridge;
+pub mod renderer;
+pub mod ui;
 
 use anyhow::Result;
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -39,7 +85,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 pub use app::{App, FrameStats, ViewerConfig, ViewerState, XRayType};
 pub use decoder::Decoder;
 
-/// Launch the ALICE-View window with the given configuration
+/// Launch the ALICE-View window with the given configuration.
 ///
 /// This function blocks until the window is closed.
 ///
@@ -66,7 +112,7 @@ pub fn launch_viewer(config: ViewerConfig) -> Result<()> {
     Ok(())
 }
 
-/// Launch viewer in a separate thread (non-blocking)
+/// Launch viewer in a separate thread (non-blocking).
 ///
 /// Returns a handle that can be used to wait for the viewer to close.
 ///
@@ -83,51 +129,10 @@ pub fn launch_viewer_async(config: ViewerConfig) -> std::thread::JoinHandle<Resu
     std::thread::spawn(move || launch_viewer(config))
 }
 
-/// Version information
+/// Version information.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Quick launch with default settings
+/// Quick launch with default settings.
 pub fn quick_launch() -> Result<()> {
     launch_viewer(ViewerConfig::default())
-}
-
-// Convenience constructors for ViewerConfig
-impl ViewerConfig {
-    /// Create config for displaying temperature data visualization
-    pub fn for_temperature_data() -> Self {
-        Self {
-            title: "ALICE-View - Temperature Visualization".to_string(),
-            show_stats: true,
-            ..Default::default()
-        }
-    }
-
-    /// Create config for fractal exploration
-    pub fn for_fractal() -> Self {
-        Self {
-            title: "ALICE-View - Fractal Explorer".to_string(),
-            initial_zoom: 1.0,
-            initial_pan: [-0.5, 0.0],
-            ..Default::default()
-        }
-    }
-
-    /// Create minimal viewer for embedding
-    pub fn minimal() -> Self {
-        Self {
-            title: "ALICE-View".to_string(),
-            width: 800,
-            height: 600,
-            ..Default::default()
-        }
-    }
-
-    /// Create config for viewing an SDF file
-    pub fn for_sdf_file(path: &str) -> Self {
-        Self {
-            title: format!("ALICE-View - {}", std::path::Path::new(path).file_name().unwrap_or_default().to_string_lossy()),
-            initial_file: Some(path.to_string()),
-            ..Default::default()
-        }
-    }
 }

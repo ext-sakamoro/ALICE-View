@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 
 /// ASP packet types
+#[allow(clippy::enum_variant_names)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AspPacketType {
@@ -107,5 +108,81 @@ impl AspStreamState {
 impl Default for AspStreamState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asp_packet_type_i_packet() {
+        assert_eq!(AspPacketType::try_from(0x49u8), Ok(AspPacketType::IPacket));
+    }
+
+    #[test]
+    fn asp_packet_type_d_packet() {
+        assert_eq!(AspPacketType::try_from(0x44u8), Ok(AspPacketType::DPacket));
+    }
+
+    #[test]
+    fn asp_packet_type_c_packet() {
+        assert_eq!(AspPacketType::try_from(0x43u8), Ok(AspPacketType::CPacket));
+    }
+
+    #[test]
+    fn asp_packet_type_s_packet() {
+        assert_eq!(AspPacketType::try_from(0x53u8), Ok(AspPacketType::SPacket));
+    }
+
+    #[test]
+    fn asp_packet_type_invalid() {
+        assert!(AspPacketType::try_from(0x00u8).is_err());
+        assert!(AspPacketType::try_from(0xFFu8).is_err());
+    }
+
+    #[test]
+    fn asp_header_valid_magic() {
+        let header = AspHeader {
+            magic: *b"ASP\x01",
+            packet_type: 0x49,
+            flags: 0,
+            reserved: 0,
+            sequence: 1,
+            payload_size: 100,
+        };
+        assert!(header.is_valid());
+    }
+
+    #[test]
+    fn asp_header_invalid_magic() {
+        let header = AspHeader {
+            magic: *b"XXXX",
+            packet_type: 0x49,
+            flags: 0,
+            reserved: 0,
+            sequence: 1,
+            payload_size: 100,
+        };
+        assert!(!header.is_valid());
+    }
+
+    #[test]
+    fn asp_stream_state_initial() {
+        let state = AspStreamState::new();
+        assert!(state.keyframe.is_none());
+        assert_eq!(state.sequence, 0);
+        assert!(state.motion_vectors.is_empty());
+    }
+
+    #[test]
+    fn asp_stream_state_default() {
+        let state = AspStreamState::default();
+        assert!(state.keyframe.is_none());
+    }
+
+    #[test]
+    fn asp_magic_constant() {
+        assert_eq!(&AspHeader::MAGIC, b"ASP\x01");
     }
 }

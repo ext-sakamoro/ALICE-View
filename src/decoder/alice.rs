@@ -36,7 +36,7 @@ pub const ALICE_VERSION: u8 = 1;
 pub enum AliceContentType {
     /// Linear model: y = slope * x + intercept
     Linear = 0,
-    /// Polynomial: y = Σ(coef[i] * x^i)
+    /// Polynomial: y = Σ(`coef[i]` * x^i)
     Polynomial = 1,
     /// Perlin noise parameters
     Perlin = 2,
@@ -93,7 +93,6 @@ pub struct AliceHeader {
     pub metadata_length: u32,
 }
 
-
 // AliceHeader fields (magic, version, flags) are used in to_bytes() and by
 // alice-create binary. Clippy flags them because derived Clone/Debug are
 // excluded from dead-code analysis.
@@ -104,7 +103,11 @@ impl AliceHeader {
     /// Parse header from bytes
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < Self::SIZE {
-            bail!("Header too short: {} bytes (need {})", data.len(), Self::SIZE);
+            bail!(
+                "Header too short: {} bytes (need {})",
+                data.len(),
+                Self::SIZE
+            );
         }
 
         let mut magic = [0u8; 5];
@@ -347,10 +350,7 @@ impl FractalPayload {
                 "BurningShip: z = (|Re(z)| + i|Im(z)|)² + c, iter={}",
                 self.max_iterations
             ),
-            3 => format!(
-                "Tricorn: z = conj(z)² + c, iter={}",
-                self.max_iterations
-            ),
+            3 => format!("Tricorn: z = conj(z)² + c, iter={}", self.max_iterations),
             _ => "Unknown fractal".to_string(),
         }
     }
@@ -503,7 +503,9 @@ impl AliceFile {
         let payload = match header.content_type {
             AliceContentType::Linear => AlicePayload::Linear(LinearPayload::parse(payload_data)?),
             AliceContentType::Perlin => AlicePayload::Perlin(PerlinPayload::parse(payload_data)?),
-            AliceContentType::Fractal => AlicePayload::Fractal(FractalPayload::parse(payload_data)?),
+            AliceContentType::Fractal => {
+                AlicePayload::Fractal(FractalPayload::parse(payload_data)?)
+            }
             _ => bail!("Unsupported content type: {:?}", header.content_type),
         };
 
@@ -669,7 +671,8 @@ impl AliceFileBuilder {
 
         let meta_bytes = self.metadata.to_json();
 
-        let compressed_size = AliceHeader::SIZE as u64 + payload_bytes.len() as u64 + meta_bytes.len() as u64;
+        let compressed_size =
+            AliceHeader::SIZE as u64 + payload_bytes.len() as u64 + meta_bytes.len() as u64;
 
         let header = AliceHeader {
             magic: *ALICE_MAGIC,
@@ -720,8 +723,8 @@ mod tests {
     #[test]
     fn test_equation_string() {
         let payload = LinearPayload {
-            slope_q16: 32767,           // ~0.5
-            intercept_q16: 163840000,   // ~2500
+            slope_q16: 32767,         // ~0.5
+            intercept_q16: 163840000, // ~2500
             sample_count: 1000,
         };
         let eq = payload.equation_string();
