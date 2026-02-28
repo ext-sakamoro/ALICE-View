@@ -6,7 +6,7 @@
 const RGB_RCP: f32 = 1.0 / 255.0;
 
 use super::export::ExportFormat;
-use crate::app::{Camera3D, RenderMode, ViewerState};
+use crate::app::{Camera3D, QualityPreset, RenderMode, ViewerState};
 use egui::{Context, Ui};
 use glam::Vec3;
 
@@ -268,6 +268,35 @@ impl SdfPanel {
 
         // Raymarching Settings
         ui.collapsing("Raymarching", |ui| {
+            // Quality Preset
+            ui.label(egui::RichText::new("Quality Preset").strong());
+            let current_name = state.sdf_quality_preset.name();
+            egui::ComboBox::from_id_source("quality_preset")
+                .selected_text(current_name)
+                .show_ui(ui, |ui| {
+                    for preset in QualityPreset::all() {
+                        if ui
+                            .selectable_label(state.sdf_quality_preset == *preset, preset.name())
+                            .clicked()
+                        {
+                            state.apply_quality_preset(*preset);
+                        }
+                    }
+                });
+
+            ui.add_space(4.0);
+
+            // Adaptive Quality
+            ui.checkbox(&mut state.sdf_adaptive_quality, "Adaptive Quality");
+            ui.label(
+                egui::RichText::new("  Reduces work for distant pixels")
+                    .small()
+                    .weak(),
+            );
+
+            ui.add_space(4.0);
+            ui.separator();
+
             ui.add(egui::Slider::new(&mut state.sdf_max_steps, 16..=512).text("Max Steps"));
 
             let mut epsilon_log = state.sdf_epsilon.log10();

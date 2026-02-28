@@ -28,7 +28,7 @@ struct Uniforms {
     scene_id: u32,          // offset 80
     _pad1: u32,             // offset 84
     _pad2: u32,             // offset 88
-    _pad3: u32,             // offset 92
+    quality_flags: u32,     // offset 92 — bit 0: adaptive quality
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -277,10 +277,18 @@ fn calc_normal(p: vec3<f32>) -> vec3<f32> {
     ));
 }
 
-fn calc_ao(p: vec3<f32>, n: vec3<f32>) -> f32 {
+fn calc_ao(p: vec3<f32>, n: vec3<f32>, hit_dist: f32) -> f32 {
     var occ = 0.0;
     var sca = 1.0;
-    for (var i = 0; i < 5; i++) {
+
+    // Adaptive AO: reduce samples for distant surfaces
+    let adaptive = (uniforms.quality_flags & 1u) != 0u;
+    var ao_steps = 5;
+    if (adaptive && hit_dist > 20.0) {
+        ao_steps = 2;
+    }
+
+    for (var i = 0; i < ao_steps; i++) {
         let h = 0.01 + 0.12 * f32(i) / 4.0;
         let d = map_scene(p + n * h);
         occ += (h - d) * sca;
@@ -292,19 +300,31 @@ fn calc_ao(p: vec3<f32>, n: vec3<f32>) -> f32 {
 fn raymarch(ro: vec3<f32>, rd: vec3<f32>) -> vec2<f32> {
     var t = 0.0;
     var steps = 0u;
+    let adaptive = (uniforms.quality_flags & 1u) != 0u;
 
     for (var i = 0u; i < uniforms.max_steps; i++) {
         let p = ro + rd * t;
         let d = map_scene(p);
 
-        if (d < uniforms.epsilon) {
+        // Adaptive epsilon: grows with distance for early termination of far pixels
+        var eps = uniforms.epsilon;
+        if (adaptive) {
+            eps = uniforms.epsilon * (1.0 + t * 0.1);
+        }
+
+        if (d < eps) {
             return vec2<f32>(t, f32(i));
         }
         if (t > uniforms.max_distance) {
             break;
         }
 
-        t += d;
+        // Adaptive step: over-relaxation for distant regions
+        if (adaptive) {
+            t += d * (1.0 + t * 0.05);
+        } else {
+            t += d;
+        }
         steps = i;
     }
 
@@ -336,7 +356,7 @@ fn get_ray(uv: vec2<f32>) -> vec3<f32> {
     );
 }
 
-fn shade(p: vec3<f32>, n: vec3<f32>, rd: vec3<f32>) -> vec3<f32> {
+fn shade(p: vec3<f32>, n: vec3<f32>, rd: vec3<f32>, hit_dist: f32) -> vec3<f32> {
     // Show normals mode
     let show_normals = (uniforms.flags & 1u) != 0u;
     if (show_normals) {
@@ -369,7 +389,7 @@ fn shade(p: vec3<f32>, n: vec3<f32>, rd: vec3<f32>) -> vec3<f32> {
     var ao = 1.0;
     let use_ao = (uniforms.flags & 2u) != 0u;
     if (use_ao) {
-        ao = calc_ao(p, n);
+        ao = calc_ao(p, n, hit_dist);
     }
 
     // Material color (gradient based on position)
@@ -408,7 +428,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (t > 0.0) {
         let p = ro + rd * t;
         let n = calc_normal(p);
-        color = shade(p, n, rd);
+        color = shade(p, n, rd, t);
 
         // Fog
         let fog = 1.0 - exp(-0.02 * t * t);

@@ -199,7 +199,7 @@ pub struct SdfUniforms {
     scene_id: u32,          // offset 80
     light_intensity: f32,   // offset 84
     ambient_intensity: f32, // offset 88
-    _pad3: u32,             // offset 92
+    quality_flags: u32,     // offset 92 — bit 0: adaptive quality
 
     // Lighting direction + bg color (32 bytes)
     light_dir: [f32; 4], // offset 96  (xyz = dir, w = unused)
@@ -413,6 +413,12 @@ impl SdfPipeline {
             flags |= 2;
         }
 
+        // Build quality_flags bitfield
+        let mut quality_flags = 0u32;
+        if state.sdf_adaptive_quality {
+            quality_flags |= 1;
+        }
+
         // Pack camera data into vec4s for proper WGSL alignment
         let pos = camera.position;
         let target = camera.target;
@@ -435,7 +441,7 @@ impl SdfPipeline {
             scene_id,
             light_intensity: state.light_intensity,
             ambient_intensity: state.ambient_intensity,
-            _pad3: 0,
+            quality_flags,
 
             light_dir: [
                 state.light_dir[0],

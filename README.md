@@ -5,11 +5,11 @@
 <h1 align="center">ALICE-View</h1>
 
 <p align="center">
-  <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.2.1-blue.svg" alt="Version"></a>
+  <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.3.0-blue.svg" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.75+-orange.svg" alt="Rust"></a>
   <a href="#quality"><img src="https://img.shields.io/badge/clippy-pedantic%200-brightgreen.svg" alt="Clippy"></a>
-  <a href="#quality"><img src="https://img.shields.io/badge/tests-68%20pass-brightgreen.svg" alt="Tests"></a>
+  <a href="#quality"><img src="https://img.shields.io/badge/tests-76%20pass-brightgreen.svg" alt="Tests"></a>
 </p>
 
 > **The Infinite Canvas**
@@ -159,7 +159,7 @@ Options:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                       ALICE-View v0.2.1                      │
+│                       ALICE-View v0.3.0                      │
 ├──────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐  │
 │  │   Decoder    │  │   Renderer    │  │       UI         │  │
@@ -239,6 +239,29 @@ Standardized `[profile.bench]` added for consistent benchmarking across ALICE cr
 | [ALICE-Edge](https://github.com/ext-sakamoro/ALICE-Edge) | Embedded/IoT model generator (no_std) |
 | [ALICE-Streaming-Protocol](https://github.com/ext-sakamoro/ALICE-Streaming-Protocol) | Ultra-low bandwidth video streaming |
 
+## Performance
+
+### Adaptive Quality (v0.3.0)
+
+Heavy SDF scenes (deep CSG trees, complex smooth operations) can be GPU-intensive. Adaptive Quality reduces work for distant pixels without visible quality loss on near surfaces.
+
+| Technique | Effect |
+|-----------|--------|
+| **Adaptive Epsilon** | Epsilon grows with ray distance (`eps * (1 + t * 0.1)`), allowing early termination for far pixels |
+| **Over-Relaxation** | Step size increases with distance (`d * (1 + t * 0.05)`), reducing total steps for background rays |
+| **Adaptive AO** | AO samples reduced from 5 to 2 for surfaces beyond `t > 20.0` |
+
+Toggle via the **Adaptive Quality** checkbox in the SDF panel (on by default).
+
+### Quality Presets
+
+| Preset | Max Steps | Epsilon | AO | Use Case |
+|--------|-----------|---------|-----|----------|
+| **Fast** | 64 | 0.01 | Off | Preview, low-end GPU |
+| **Balanced** | 128 | 0.001 | On | Default, general use |
+| **Quality** | 256 | 0.0001 | On | Final renders |
+| **Ultra** | 512 | 0.00001 | On | Maximum detail |
+
 ## Quality
 
 | Gate | Status |
@@ -246,7 +269,7 @@ Standardized `[profile.bench]` added for consistent benchmarking across ALICE cr
 | `cargo clippy -- -W clippy::pedantic` | **0 warnings** |
 | `cargo doc --no-deps` | **0 warnings** |
 | `cargo fmt -- --check` | **0 diff** |
-| `cargo test --lib` | **68 passed, 0 failed** |
+| `cargo test --lib` | **76 passed, 0 failed** |
 
 ## License
 

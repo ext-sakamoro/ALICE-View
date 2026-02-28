@@ -1,6 +1,6 @@
 [package]
 name = "alice-view"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Moroya Sakamoto"]
 description = "The Infinite Canvas - Real-time procedural rendering engine for ALICE ecosystem"

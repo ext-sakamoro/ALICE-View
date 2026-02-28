@@ -2,6 +2,17 @@
 
 All notable changes to ALICE-View are documented here.
 
+## [0.3.0] — 2026-02-28
+
+### Added
+- **Adaptive Quality** — Distance-based epsilon scaling and step over-relaxation for faster rendering of heavy SDF scenes
+- **Quality Presets** — Fast / Balanced / Quality / Ultra one-click presets for raymarching settings
+- **Adaptive AO** — Ambient occlusion sample count reduced for distant surfaces (5 → 2 when `t > 20.0`)
+- Quality Preset combo box and Adaptive Quality checkbox in SDF panel
+- `QualityPreset` enum with `apply_quality_preset()` for programmatic preset application
+- `quality_flags` uniform field (replaces `_pad3` at offset 92) for GPU-side feature toggles
+- 8 new unit tests for `QualityPreset` and adaptive quality defaults
+
 ## [0.2.1] — 2026-02-28
 
 ### Changed

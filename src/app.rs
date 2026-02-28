@@ -108,6 +108,39 @@ impl Camera3D {
     }
 }
 
+/// Quality preset for SDF raymarching
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum QualityPreset {
+    /// Fast: `max_steps` = 64, epsilon = 0.01, AO off
+    Fast,
+    /// Balanced: `max_steps` = 128, epsilon = 0.001, AO on (default)
+    #[default]
+    Balanced,
+    /// Quality: `max_steps` = 256, epsilon = 0.0001, AO on
+    Quality,
+    /// Ultra: `max_steps` = 512, epsilon = 0.00001, AO on
+    Ultra,
+}
+
+impl QualityPreset {
+    /// Display name of this preset
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Fast => "Fast",
+            Self::Balanced => "Balanced",
+            Self::Quality => "Quality",
+            Self::Ultra => "Ultra",
+        }
+    }
+
+    /// All available presets in order
+    #[must_use]
+    pub fn all() -> &'static [Self] {
+        &[Self::Fast, Self::Balanced, Self::Quality, Self::Ultra]
+    }
+}
+
 /// Render mode selection
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenderMode {
@@ -157,6 +190,10 @@ pub struct ViewerState {
     pub sdf_epsilon: f32,
     pub sdf_show_normals: bool,
     pub sdf_ambient_occlusion: bool,
+    /// Adaptive quality: scales epsilon and step size with ray distance
+    pub sdf_adaptive_quality: bool,
+    /// Current quality preset
+    pub sdf_quality_preset: QualityPreset,
 
     // Lighting
     pub light_dir: [f32; 3],
@@ -191,11 +228,40 @@ impl ViewerState {
             sdf_epsilon: 0.001,
             sdf_show_normals: false,
             sdf_ambient_occlusion: true,
+            sdf_adaptive_quality: true,
+            sdf_quality_preset: QualityPreset::default(),
             light_dir: [0.5, 1.0, 0.3],
             light_intensity: 1.0,
             ambient_intensity: 0.15,
             bg_color: [0.02, 0.02, 0.05],
             screenshot_requested: false,
+        }
+    }
+
+    /// Apply a quality preset, updating `max_steps`, epsilon, and AO accordingly
+    pub fn apply_quality_preset(&mut self, preset: QualityPreset) {
+        self.sdf_quality_preset = preset;
+        match preset {
+            QualityPreset::Fast => {
+                self.sdf_max_steps = 64;
+                self.sdf_epsilon = 0.01;
+                self.sdf_ambient_occlusion = false;
+            }
+            QualityPreset::Balanced => {
+                self.sdf_max_steps = 128;
+                self.sdf_epsilon = 0.001;
+                self.sdf_ambient_occlusion = true;
+            }
+            QualityPreset::Quality => {
+                self.sdf_max_steps = 256;
+                self.sdf_epsilon = 0.0001;
+                self.sdf_ambient_occlusion = true;
+            }
+            QualityPreset::Ultra => {
+                self.sdf_max_steps = 512;
+                self.sdf_epsilon = 0.000_01;
+                self.sdf_ambient_occlusion = true;
+            }
         }
     }
 }
@@ -848,5 +914,70 @@ mod tests {
     #[test]
     fn xray_type_default_is_motion_vectors() {
         assert_eq!(XRayType::default(), XRayType::MotionVectors);
+    }
+
+    // ── QualityPreset ───────────────────────────────────────────
+
+    #[test]
+    fn quality_preset_default_is_balanced() {
+        assert_eq!(QualityPreset::default(), QualityPreset::Balanced);
+    }
+
+    #[test]
+    fn quality_preset_names() {
+        assert_eq!(QualityPreset::Fast.name(), "Fast");
+        assert_eq!(QualityPreset::Balanced.name(), "Balanced");
+        assert_eq!(QualityPreset::Quality.name(), "Quality");
+        assert_eq!(QualityPreset::Ultra.name(), "Ultra");
+    }
+
+    #[test]
+    fn quality_preset_all_count() {
+        assert_eq!(QualityPreset::all().len(), 4);
+    }
+
+    #[test]
+    fn apply_quality_preset_fast() {
+        let mut state = ViewerState::new(RenderMode::Sdf3D, false);
+        state.apply_quality_preset(QualityPreset::Fast);
+        assert_eq!(state.sdf_max_steps, 64);
+        assert!((state.sdf_epsilon - 0.01).abs() < 1e-10);
+        assert!(!state.sdf_ambient_occlusion);
+        assert_eq!(state.sdf_quality_preset, QualityPreset::Fast);
+    }
+
+    #[test]
+    fn apply_quality_preset_balanced() {
+        let mut state = ViewerState::new(RenderMode::Sdf3D, false);
+        state.apply_quality_preset(QualityPreset::Fast); // change first
+        state.apply_quality_preset(QualityPreset::Balanced);
+        assert_eq!(state.sdf_max_steps, 128);
+        assert!((state.sdf_epsilon - 0.001).abs() < 1e-10);
+        assert!(state.sdf_ambient_occlusion);
+    }
+
+    #[test]
+    fn apply_quality_preset_quality() {
+        let mut state = ViewerState::new(RenderMode::Sdf3D, false);
+        state.apply_quality_preset(QualityPreset::Quality);
+        assert_eq!(state.sdf_max_steps, 256);
+        assert!((state.sdf_epsilon - 0.0001).abs() < 1e-10);
+        assert!(state.sdf_ambient_occlusion);
+    }
+
+    #[test]
+    fn apply_quality_preset_ultra() {
+        let mut state = ViewerState::new(RenderMode::Sdf3D, false);
+        state.apply_quality_preset(QualityPreset::Ultra);
+        assert_eq!(state.sdf_max_steps, 512);
+        assert!((state.sdf_epsilon - 0.00001).abs() < 1e-10);
+        assert!(state.sdf_ambient_occlusion);
+    }
+
+    #[test]
+    fn viewer_state_adaptive_quality_default() {
+        let state = ViewerState::new(RenderMode::Sdf3D, false);
+        assert!(state.sdf_adaptive_quality);
+        assert_eq!(state.sdf_quality_preset, QualityPreset::Balanced);
     }
 }
