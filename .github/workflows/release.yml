@@ -12,9 +12,33 @@ on:
 permissions:
   contents: write
 
+# All ALICE crates that appear as transitive path dependencies.
+# Cargo resolves every path dep (even optional) at resolution time,
+# so we must checkout them all.
+env:
+  SIBLING_REPOS: >-
+    ALICE-SDF
+    ALICE-Analytics
+    ALICE-Physics
+    ALICE-DB
+    ALICE-Codec
+    ALICE-Streaming-Protocol
+    ALICE-Cache
+    ALICE-Font
+    ALICE-ML
+    ALICE-Crypto
+    ALICE-Voice
+    ALICE-Sync
+    ALICE-Queue
+    ALICE-Zip
+    ALICE-Text
+    ALICE-Auth
+    ALICE-Search
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -35,10 +59,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout sibling ALICE crates
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for repo in $SIBLING_REPOS; do
+            echo "::group::Cloning $repo"
+            git clone --depth 1 \
+              "https://github.com/ext-sakamoro/${repo}.git" \
+              "../${repo}" || true
+            echo "::endgroup::"
+          done
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev
 
       - name: Cache cargo registry & build
         uses: actions/cache@v4
