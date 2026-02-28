@@ -15,6 +15,7 @@ pub struct ViewportState {
 }
 
 impl ViewportState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             drag_start: None,
@@ -34,10 +35,7 @@ impl ViewportState {
             let zoom_rcp = 1.0 / zoom;
             let delta_x = (pos[0] - start[0]) * zoom_rcp;
             let delta_y = (pos[1] - start[1]) * zoom_rcp;
-            [
-                self.initial_pan[0] + delta_x,
-                self.initial_pan[1] + delta_y,
-            ]
+            [self.initial_pan[0] + delta_x, self.initial_pan[1] + delta_y]
         })
     }
 
@@ -47,6 +45,7 @@ impl ViewportState {
     }
 
     /// Check if dragging
+    #[must_use]
     pub fn is_dragging(&self) -> bool {
         self.drag_start.is_some()
     }
@@ -70,4 +69,61 @@ pub fn render_viewport_info(ctx: &egui::Context, state: &ViewerState) {
                     ui.label(format!("Zoom: {:.2}x", state.zoom));
                 });
         });
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn viewport_initial_state() {
+        let vs = ViewportState::new();
+        assert!(!vs.is_dragging());
+    }
+
+    #[test]
+    fn viewport_start_drag() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([100.0, 200.0], [0.0, 0.0]);
+        assert!(vs.is_dragging());
+    }
+
+    #[test]
+    fn viewport_end_drag() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([100.0, 200.0], [0.0, 0.0]);
+        assert!(vs.is_dragging());
+        vs.end_drag();
+        assert!(!vs.is_dragging());
+    }
+
+    #[test]
+    fn viewport_update_drag_returns_pan() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([0.0, 0.0], [0.0, 0.0]);
+        let pan = vs.update_drag([10.0, 5.0], 1.0);
+        assert!(pan.is_some());
+        let p = pan.unwrap();
+        assert!((p[0] - 10.0).abs() < 1e-5);
+        assert!((p[1] - 5.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn viewport_update_drag_zoom_scaling() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([0.0, 0.0], [0.0, 0.0]);
+        // At zoom=2, movement should be halved
+        let pan = vs.update_drag([10.0, 0.0], 2.0);
+        let p = pan.unwrap();
+        assert!((p[0] - 5.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn viewport_no_drag_returns_none() {
+        let mut vs = ViewportState::new();
+        let pan = vs.update_drag([10.0, 5.0], 1.0);
+        assert!(pan.is_none());
+    }
 }

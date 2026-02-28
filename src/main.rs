@@ -3,6 +3,19 @@
 //! Real-time procedural rendering engine for the ALICE ecosystem.
 //! "See the Math. Not the Pixels."
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::module_name_repetitions,
+    clippy::inline_always,
+    clippy::too_many_lines
+)]
+
 mod app;
 mod decoder;
 mod renderer;
@@ -28,7 +41,10 @@ fn save_recent_file(path: &str) {
     let _ = std::fs::create_dir_all(&dir);
     let recent = dir.join("recent.json");
     let data = serde_json::json!({ "last_file": path });
-    let _ = std::fs::write(recent, serde_json::to_string_pretty(&data).unwrap_or_default());
+    let _ = std::fs::write(
+        recent,
+        serde_json::to_string_pretty(&data).unwrap_or_default(),
+    );
 }
 
 /// Load last opened file path
@@ -36,11 +52,14 @@ fn load_recent_file() -> Option<String> {
     let recent = config_dir().join("recent.json");
     let data = std::fs::read_to_string(recent).ok()?;
     let json: serde_json::Value = serde_json::from_str(&data).ok()?;
-    json.get("last_file")?.as_str().map(|s| s.to_string())
+    json.get("last_file")?.as_str().map(String::from)
 }
 
 fn print_usage() {
-    eprintln!("ALICE-View v{} - The Infinite Canvas", env!("CARGO_PKG_VERSION"));
+    eprintln!(
+        "ALICE-View v{} - The Infinite Canvas",
+        env!("CARGO_PKG_VERSION")
+    );
     eprintln!("\"See the Math. Not the Pixels.\"");
     eprintln!();
     eprintln!("Usage: alice-view [OPTIONS] [FILE]");

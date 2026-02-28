@@ -67,6 +67,19 @@
 //! | F11 | Fullscreen |
 //! | F12 | Screenshot (PNG) |
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::module_name_repetitions,
+    clippy::inline_always,
+    clippy::too_many_lines
+)]
+
 #[cfg(feature = "analytics")]
 pub mod analytics_bridge;
 pub mod app;
@@ -88,6 +101,11 @@ pub use decoder::Decoder;
 /// Launch the ALICE-View window with the given configuration.
 ///
 /// This function blocks until the window is closed.
+///
+/// # Errors
+///
+/// Returns an error if the event loop cannot be created or if the window
+/// event loop exits with a non-zero status.
 ///
 /// # Example
 ///
@@ -125,6 +143,7 @@ pub fn launch_viewer(config: ViewerConfig) -> Result<()> {
 /// // Do other work...
 /// handle.join().unwrap();
 /// ```
+#[must_use]
 pub fn launch_viewer_async(config: ViewerConfig) -> std::thread::JoinHandle<Result<()>> {
     std::thread::spawn(move || launch_viewer(config))
 }
@@ -133,6 +152,11 @@ pub fn launch_viewer_async(config: ViewerConfig) -> std::thread::JoinHandle<Resu
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Quick launch with default settings.
+///
+/// # Errors
+///
+/// Returns an error if the viewer window cannot be created or the event loop
+/// exits with an error.
 pub fn quick_launch() -> Result<()> {
     launch_viewer(ViewerConfig::default())
 }

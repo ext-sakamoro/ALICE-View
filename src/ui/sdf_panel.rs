@@ -5,8 +5,8 @@
 
 const RGB_RCP: f32 = 1.0 / 255.0;
 
-use crate::app::{Camera3D, RenderMode, ViewerState};
 use super::export::ExportFormat;
+use crate::app::{Camera3D, RenderMode, ViewerState};
 use egui::{Context, Ui};
 use glam::Vec3;
 
@@ -32,18 +32,20 @@ pub enum SdfScene {
 }
 
 impl SdfScene {
-    pub fn name(&self) -> &'static str {
+    #[must_use]
+    pub fn name(self) -> &'static str {
         match self {
-            SdfScene::CarvedSphere => "Carved Sphere",
-            SdfScene::Sphere => "Simple Sphere",
-            SdfScene::RoundedBox => "Rounded Box",
-            SdfScene::TorusKnot => "Torus Knot",
-            SdfScene::InfinitePillars => "Infinite Pillars",
-            SdfScene::TwistedBox => "Twisted Box",
-            SdfScene::LoadedAsdf => "Loaded .asdf",
+            Self::CarvedSphere => "Carved Sphere",
+            Self::Sphere => "Simple Sphere",
+            Self::RoundedBox => "Rounded Box",
+            Self::TorusKnot => "Torus Knot",
+            Self::InfinitePillars => "Infinite Pillars",
+            Self::TwistedBox => "Twisted Box",
+            Self::LoadedAsdf => "Loaded .asdf",
         }
     }
 
+    #[must_use]
     pub fn all_demo() -> &'static [SdfScene] {
         &[
             SdfScene::CarvedSphere,
@@ -77,6 +79,7 @@ impl Default for SdfPanel {
 }
 
 impl SdfPanel {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             scene: SdfScene::default(),
@@ -119,13 +122,20 @@ impl SdfPanel {
         // Scene Selection
         ui.collapsing("Scene", |ui| {
             if self.has_dynamic_sdf {
-                ui.label(egui::RichText::new("Loaded SDF").strong().color(egui::Color32::from_rgb(100, 255, 100)));
+                ui.label(
+                    egui::RichText::new("Loaded SDF")
+                        .strong()
+                        .color(egui::Color32::from_rgb(100, 255, 100)),
+                );
                 let label = if let Some(ref info) = self.loaded_asdf_info {
-                    format!("  {}", info)
+                    format!("  {info}")
                 } else {
                     "  Loaded .asdf".to_string()
                 };
-                if ui.selectable_label(self.scene == SdfScene::LoadedAsdf, label).clicked() {
+                if ui
+                    .selectable_label(self.scene == SdfScene::LoadedAsdf, label)
+                    .clicked()
+                {
                     self.scene = SdfScene::LoadedAsdf;
                 }
                 ui.separator();
@@ -133,7 +143,10 @@ impl SdfPanel {
 
             ui.label(egui::RichText::new("Demo Scenes").small().weak());
             for scene in SdfScene::all_demo() {
-                if ui.selectable_label(self.scene == *scene, scene.name()).clicked() {
+                if ui
+                    .selectable_label(self.scene == *scene, scene.name())
+                    .clicked()
+                {
                     self.scene = *scene;
                 }
             }
@@ -146,16 +159,32 @@ impl SdfPanel {
             let mut pos = state.camera.position;
             ui.horizontal(|ui| {
                 ui.label("X:");
-                ui.add(egui::DragValue::new(&mut pos.x).speed(0.1).clamp_range(-50.0..=50.0));
+                ui.add(
+                    egui::DragValue::new(&mut pos.x)
+                        .speed(0.1)
+                        .clamp_range(-50.0..=50.0),
+                );
                 ui.label("Y:");
-                ui.add(egui::DragValue::new(&mut pos.y).speed(0.1).clamp_range(-50.0..=50.0));
+                ui.add(
+                    egui::DragValue::new(&mut pos.y)
+                        .speed(0.1)
+                        .clamp_range(-50.0..=50.0),
+                );
                 ui.label("Z:");
-                ui.add(egui::DragValue::new(&mut pos.z).speed(0.1).clamp_range(-50.0..=50.0));
+                ui.add(
+                    egui::DragValue::new(&mut pos.z)
+                        .speed(0.1)
+                        .clamp_range(-50.0..=50.0),
+                );
             });
             state.camera.position = pos;
 
             let mut fov_deg = state.camera.fov.to_degrees();
-            ui.add(egui::Slider::new(&mut fov_deg, 20.0..=120.0).text("FOV").suffix("°"));
+            ui.add(
+                egui::Slider::new(&mut fov_deg, 20.0..=120.0)
+                    .text("FOV")
+                    .suffix("°"),
+            );
             state.camera.fov = fov_deg.to_radians();
 
             ui.add_space(4.0);
@@ -244,7 +273,11 @@ impl SdfPanel {
             let mut epsilon_log = state.sdf_epsilon.log10();
             ui.add(egui::Slider::new(&mut epsilon_log, -5.0..=-1.0).text("Epsilon"));
             state.sdf_epsilon = 10.0_f32.powf(epsilon_log);
-            ui.label(egui::RichText::new(format!("  = {:.6}", state.sdf_epsilon)).small().weak());
+            ui.label(
+                egui::RichText::new(format!("  = {:.6}", state.sdf_epsilon))
+                    .small()
+                    .weak(),
+            );
         });
 
         ui.add_space(8.0);
@@ -315,13 +348,71 @@ impl SdfPanel {
             ui.label(
                 egui::RichText::new("High step count may reduce FPS")
                     .color(egui::Color32::YELLOW)
-                    .small()
+                    .small(),
             );
         }
     }
 
     /// Get current scene ID for shader
+    #[must_use]
     pub fn scene_id(&self) -> u32 {
         self.scene as u32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sdf_scene_default_is_carved_sphere() {
+        assert_eq!(SdfScene::default(), SdfScene::CarvedSphere);
+    }
+
+    #[test]
+    fn sdf_scene_names() {
+        assert_eq!(SdfScene::CarvedSphere.name(), "Carved Sphere");
+        assert_eq!(SdfScene::Sphere.name(), "Simple Sphere");
+        assert_eq!(SdfScene::LoadedAsdf.name(), "Loaded .asdf");
+    }
+
+    #[test]
+    fn sdf_scene_all_demo_count() {
+        assert_eq!(SdfScene::all_demo().len(), 6);
+    }
+
+    #[test]
+    fn sdf_scene_all_demo_no_loaded() {
+        for scene in SdfScene::all_demo() {
+            assert_ne!(*scene, SdfScene::LoadedAsdf);
+        }
+    }
+
+    #[test]
+    fn sdf_panel_new_defaults() {
+        let panel = SdfPanel::new();
+        assert_eq!(panel.scene, SdfScene::CarvedSphere);
+        assert_eq!(panel.export_resolution, 64);
+        assert!(panel.pending_export.is_none());
+    }
+
+    #[test]
+    fn sdf_panel_scene_id() {
+        let panel = SdfPanel::new();
+        assert_eq!(panel.scene_id(), 0);
+    }
+
+    #[test]
+    fn sdf_panel_set_dynamic_sdf() {
+        let mut panel = SdfPanel::new();
+        panel.set_dynamic_sdf(true, Some("test.asdf".to_string()));
+        assert_eq!(panel.scene, SdfScene::LoadedAsdf);
+        assert_eq!(panel.scene_id(), 100);
+    }
+
+    #[test]
+    fn sdf_panel_default_trait() {
+        let panel = SdfPanel::default();
+        assert_eq!(panel.scene, SdfScene::CarvedSphere);
     }
 }

@@ -17,7 +17,11 @@ pub fn render_xray_overlay(ctx: &egui::Context, state: &ViewerState) {
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("🔬");
-                        ui.label(RichText::new("X-RAY DEBUGGER").strong().color(Color32::from_rgb(0, 255, 255)));
+                        ui.label(
+                            RichText::new("X-RAY DEBUGGER")
+                                .strong()
+                                .color(Color32::from_rgb(0, 255, 255)),
+                        );
                     });
 
                     ui.separator();
@@ -28,18 +32,13 @@ pub fn render_xray_overlay(ctx: &egui::Context, state: &ViewerState) {
                             "MOTION VECTORS",
                             "Visualizing ASP flow field (Green=H, Red=V)",
                         ),
-                        XRayType::FftHeatmap => (
-                            "FFT HEATMAP",
-                            "Frequency domain intensity (High=Bright)",
-                        ),
-                        XRayType::EquationOverlay => (
-                            "MATH OVERLAY",
-                            "Underlying parametric equations",
-                        ),
-                        XRayType::Wireframe => (
-                            "WIREFRAME",
-                            "Procedural mesh tessellation",
-                        ),
+                        XRayType::FftHeatmap => {
+                            ("FFT HEATMAP", "Frequency domain intensity (High=Bright)")
+                        }
+                        XRayType::EquationOverlay => {
+                            ("MATH OVERLAY", "Underlying parametric equations")
+                        }
+                        XRayType::Wireframe => ("WIREFRAME", "Procedural mesh tessellation"),
                     };
 
                     ui.horizontal(|ui| {
@@ -150,11 +149,11 @@ pub struct XRayColors {
 impl Default for XRayColors {
     fn default() -> Self {
         Self {
-            motion_positive: [0.0, 1.0, 0.5],  // Green
-            motion_negative: [1.0, 0.3, 0.3],  // Red
-            frequency_low: [0.0, 0.0, 0.2],    // Dark blue
-            frequency_high: [1.0, 1.0, 0.0],   // Yellow
-            wireframe: [0.0, 1.0, 1.0],        // Cyan
+            motion_positive: [0.0, 1.0, 0.5], // Green
+            motion_negative: [1.0, 0.3, 0.3], // Red
+            frequency_low: [0.0, 0.0, 0.2],   // Dark blue
+            frequency_high: [1.0, 1.0, 0.0],  // Yellow
+            wireframe: [0.0, 1.0, 1.0],       // Cyan
         }
     }
 }

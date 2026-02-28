@@ -37,10 +37,11 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    /// Create from AliceFile
+    /// Create from `AliceFile`
+    #[must_use]
     pub fn from_alice_file(file: &AliceFile, path: Option<&str>) -> Self {
         let mut info = Self {
-            path: path.map(|s| s.to_string()),
+            path: path.map(std::string::ToString::to_string),
             content_type: file.content_type_name().to_string(),
             equation: file.equation_string(),
             compression_ratio: file.compression_ratio(),
@@ -59,25 +60,51 @@ impl FileInfo {
         match &file.payload {
             AlicePayload::Linear(p) => {
                 info.sample_count = Some(p.sample_count);
-                info.details.push(("Slope (Q16)".to_string(), format!("{}", p.slope_q16)));
-                info.details.push(("Intercept (Q16)".to_string(), format!("{}", p.intercept_q16)));
-                info.details.push(("Slope (float)".to_string(), format!("{:.6}", p.slope_f32())));
-                info.details.push(("Intercept (float)".to_string(), format!("{:.4}", p.intercept_f32())));
+                info.details
+                    .push(("Slope (Q16)".to_string(), format!("{}", p.slope_q16)));
+                info.details.push((
+                    "Intercept (Q16)".to_string(),
+                    format!("{}", p.intercept_q16),
+                ));
+                info.details
+                    .push(("Slope (float)".to_string(), format!("{:.6}", p.slope_f32())));
+                info.details.push((
+                    "Intercept (float)".to_string(),
+                    format!("{:.4}", p.intercept_f32()),
+                ));
             }
             AlicePayload::Perlin(p) => {
-                info.details.push(("Seed".to_string(), format!("{}", p.seed)));
-                info.details.push(("Scale".to_string(), format!("{:.2}", p.scale)));
-                info.details.push(("Octaves".to_string(), format!("{}", p.octaves)));
-                info.details.push(("Persistence".to_string(), format!("{:.2}", p.persistence)));
-                info.details.push(("Lacunarity".to_string(), format!("{:.2}", p.lacunarity)));
+                info.details
+                    .push(("Seed".to_string(), format!("{}", p.seed)));
+                info.details
+                    .push(("Scale".to_string(), format!("{:.2}", p.scale)));
+                info.details
+                    .push(("Octaves".to_string(), format!("{}", p.octaves)));
+                info.details
+                    .push(("Persistence".to_string(), format!("{:.2}", p.persistence)));
+                info.details
+                    .push(("Lacunarity".to_string(), format!("{:.2}", p.lacunarity)));
             }
             AlicePayload::Fractal(p) => {
-                info.details.push(("Type".to_string(), p.fractal_name().to_string()));
-                info.details.push(("Max Iterations".to_string(), format!("{}", p.max_iterations)));
-                info.details.push(("Escape Radius".to_string(), format!("{:.1}", p.escape_radius)));
-                info.details.push(("Center".to_string(), format!("({:.6}, {:.6})", p.center_x, p.center_y)));
+                info.details
+                    .push(("Type".to_string(), p.fractal_name().to_string()));
+                info.details.push((
+                    "Max Iterations".to_string(),
+                    format!("{}", p.max_iterations),
+                ));
+                info.details.push((
+                    "Escape Radius".to_string(),
+                    format!("{:.1}", p.escape_radius),
+                ));
+                info.details.push((
+                    "Center".to_string(),
+                    format!("({:.6}, {:.6})", p.center_x, p.center_y),
+                ));
                 if p.fractal_type == 1 {
-                    info.details.push(("Julia C".to_string(), format!("({:.4}, {:.4})", p.julia_cx, p.julia_cy)));
+                    info.details.push((
+                        "Julia C".to_string(),
+                        format!("({:.4}, {:.4})", p.julia_cx, p.julia_cy),
+                    ));
                 }
             }
         }
@@ -106,7 +133,7 @@ impl FileInfo {
             ui.label(
                 RichText::new(&self.content_type)
                     .color(Color32::from_rgb(100, 200, 100))
-                    .strong()
+                    .strong(),
             );
         });
 
@@ -120,7 +147,7 @@ impl FileInfo {
                 RichText::new(&self.equation)
                     .color(Color32::from_rgb(255, 200, 100))
                     .monospace()
-                    .size(16.0)
+                    .size(16.0),
             );
         });
 
@@ -136,7 +163,7 @@ impl FileInfo {
                 ui.label(
                     RichText::new(format!("{:.1}x", self.compression_ratio))
                         .color(Color32::from_rgb(100, 200, 255))
-                        .strong()
+                        .strong(),
                 );
             });
 
@@ -149,14 +176,14 @@ impl FileInfo {
                 ui.label("Compressed:");
                 ui.label(
                     RichText::new(format_bytes(self.compressed_size))
-                        .color(Color32::from_rgb(100, 255, 100))
+                        .color(Color32::from_rgb(100, 255, 100)),
                 );
             });
 
             if let Some(count) = self.sample_count {
                 ui.horizontal(|ui| {
                     ui.label("Samples:");
-                    ui.label(format!("{}", count));
+                    ui.label(format!("{count}"));
                 });
             }
         });
@@ -215,7 +242,7 @@ impl FileInfo {
             ui.collapsing("🔧 Technical Details", |ui| {
                 for (key, value) in &self.details {
                     ui.horizontal(|ui| {
-                        ui.label(format!("{}:", key));
+                        ui.label(format!("{key}:"));
                         ui.monospace(value);
                     });
                 }
@@ -227,13 +254,51 @@ impl FileInfo {
 /// Format bytes to human-readable string
 fn format_bytes(bytes: u64) -> String {
     if bytes < 1024 {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     } else if bytes < 1024 * 1024 {
         format!("{:.1} KB", bytes as f64 / 1024.0)
     } else if bytes < 1024 * 1024 * 1024 {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     } else {
         format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_bytes_b() {
+        assert_eq!(format_bytes(0), "0 B");
+        assert_eq!(format_bytes(512), "512 B");
+        assert_eq!(format_bytes(1023), "1023 B");
+    }
+
+    #[test]
+    fn format_bytes_kb() {
+        let s = format_bytes(1024);
+        assert!(s.contains("KB"), "Expected KB, got: {}", s);
+    }
+
+    #[test]
+    fn format_bytes_mb() {
+        let s = format_bytes(1024 * 1024);
+        assert!(s.contains("MB"), "Expected MB, got: {}", s);
+    }
+
+    #[test]
+    fn format_bytes_gb() {
+        let s = format_bytes(1024 * 1024 * 1024);
+        assert!(s.contains("GB"), "Expected GB, got: {}", s);
+    }
+
+    #[test]
+    fn file_info_default() {
+        let info = FileInfo::default();
+        assert!(info.path.is_none());
+        assert_eq!(info.compression_ratio, 0.0);
+        assert!(info.details.is_empty());
     }
 }
 
@@ -246,7 +311,7 @@ pub fn render_compact_info(ui: &mut Ui, info: &FileInfo) {
         ui.label(
             RichText::new(&info.content_type)
                 .color(Color32::from_rgb(100, 200, 100))
-                .small()
+                .small(),
         );
 
         ui.separator();
@@ -255,16 +320,13 @@ pub fn render_compact_info(ui: &mut Ui, info: &FileInfo) {
         ui.label(
             RichText::new(format!("{:.0}x", info.compression_ratio))
                 .color(Color32::from_rgb(100, 200, 255))
-                .small()
+                .small(),
         );
 
         ui.separator();
 
         // Size
-        ui.label(
-            RichText::new(format_bytes(info.compressed_size))
-                .small()
-        );
+        ui.label(RichText::new(format_bytes(info.compressed_size)).small());
 
         // Unit if available
         if let Some(ref unit) = info.unit {

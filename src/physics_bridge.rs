@@ -3,7 +3,7 @@
 //! Interactive physics visualization in the renderer.
 //! Converts PhysicsWorld body data into renderable geometry for debug overlay.
 
-use alice_physics::{PhysicsWorld, BodyType};
+use alice_physics::{BodyType, PhysicsWorld};
 
 /// Renderable body representation for the viewer.
 #[derive(Clone, Debug)]
@@ -27,29 +27,34 @@ pub struct RenderBody {
 /// Converts all bodies' fixed-point positions and velocities to
 /// f32 for GPU rendering.
 pub fn extract_render_bodies(world: &PhysicsWorld) -> Vec<RenderBody> {
-    world.bodies.iter().enumerate().map(|(i, body)| {
-        let (px, py, pz) = body.position.to_f32();
-        let (vx, vy, vz) = body.velocity.to_f32();
+    world
+        .bodies
+        .iter()
+        .enumerate()
+        .map(|(i, body)| {
+            let (px, py, pz) = body.position.to_f32();
+            let (vx, vy, vz) = body.velocity.to_f32();
 
-        let speed = (vx * vx + vy * vy + vz * vz).sqrt();
-        let (dx, dy, dz) = if speed > 1e-6 {
-            let speed_rcp = 1.0 / speed;
-            (vx * speed_rcp, vy * speed_rcp, vz * speed_rcp)
-        } else {
-            (0.0, 0.0, 0.0)
-        };
+            let speed = (vx * vx + vy * vy + vz * vz).sqrt();
+            let (dx, dy, dz) = if speed > 1e-6 {
+                let speed_rcp = 1.0 / speed;
+                (vx * speed_rcp, vy * speed_rcp, vz * speed_rcp)
+            } else {
+                (0.0, 0.0, 0.0)
+            };
 
-        let is_static = matches!(body.body_type, BodyType::Static);
+            let is_static = matches!(body.body_type, BodyType::Static);
 
-        RenderBody {
-            position: [px, py, pz],
-            velocity_dir: [dx, dy, dz],
-            speed,
-            radius: 0.5,
-            is_static,
-            body_index: i,
-        }
-    }).collect()
+            RenderBody {
+                position: [px, py, pz],
+                velocity_dir: [dx, dy, dz],
+                speed,
+                radius: 0.5,
+                is_static,
+                body_index: i,
+            }
+        })
+        .collect()
 }
 
 /// Compute the axis-aligned bounding box of all bodies (for camera framing).
@@ -67,8 +72,12 @@ pub fn compute_world_bounds(world: &PhysicsWorld) -> ([f32; 3], [f32; 3]) {
         let (px, py, pz) = body.position.to_f32();
         let p = [px, py, pz];
         for d in 0..3 {
-            if p[d] < min[d] { min[d] = p[d]; }
-            if p[d] > max[d] { max[d] = p[d]; }
+            if p[d] < min[d] {
+                min[d] = p[d];
+            }
+            if p[d] > max[d] {
+                max[d] = p[d];
+            }
         }
     }
 
@@ -110,7 +119,7 @@ pub fn count_bodies(world: &PhysicsWorld) -> BodyCounts {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alice_physics::PhysicsConfig;
+    use alice_physics::{Fix128, PhysicsConfig, RigidBody, Vec3Fix};
 
     #[test]
     fn test_extract_render_bodies() {

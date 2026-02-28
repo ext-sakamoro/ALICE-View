@@ -2,7 +2,14 @@
 
 use crate::app::ViewerState;
 use crate::decoder::Decoder;
-use wgpu::*;
+use wgpu::{
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, BindingType, BlendState, Buffer, BufferBindingType, BufferDescriptor,
+    BufferUsages, ColorTargetState, ColorWrites, Device, FragmentState, FrontFace,
+    MultisampleState, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
+    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
+    ShaderSource, ShaderStages, TextureFormat, VertexState,
+};
 
 /// Procedural rendering pipeline
 pub struct ProceduralPipeline {
@@ -22,19 +29,20 @@ pub struct ProceduralPipeline {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
-    resolution: [f32; 2],   // offset 0  (align 8)
-    time: f32,              // offset 8  (align 4)
-    zoom: f32,              // offset 12 (align 4)
-    pan: [f32; 2],          // offset 16 (align 8)
-    content_type: u32,      // offset 24 (align 4)
-    param1: f32,            // offset 28
-    param2: f32,            // offset 32
-    param3: f32,            // offset 36
-    param4: f32,            // offset 40
-    _pad1: u32,             // offset 44 (padding to 48 bytes, 16-byte boundary)
+    resolution: [f32; 2], // offset 0  (align 8)
+    time: f32,            // offset 8  (align 4)
+    zoom: f32,            // offset 12 (align 4)
+    pan: [f32; 2],        // offset 16 (align 8)
+    content_type: u32,    // offset 24 (align 4)
+    param1: f32,          // offset 28
+    param2: f32,          // offset 32
+    param3: f32,          // offset 36
+    param4: f32,          // offset 40
+    _pad1: u32,           // offset 44 (padding to 48 bytes, 16-byte boundary)
 }
 
 impl ProceduralPipeline {
+    #[must_use]
     pub fn new(device: &Device, format: TextureFormat) -> Self {
         // Shader module
         let shader = device.create_shader_module(ShaderModuleDescriptor {
@@ -135,9 +143,9 @@ impl ProceduralPipeline {
             time,
             zoom: state.zoom,
             pan: state.pan,
-            content_type: 0,  // Default to Perlin
-            param1: 10.0,     // scale
-            param2: 6.0,      // octaves
+            content_type: 0, // Default to Perlin
+            param1: 10.0,    // scale
+            param2: 6.0,     // octaves
             param3: 0.0,
             param4: 0.0,
             _pad1: 0,
@@ -168,24 +176,24 @@ impl ProceduralPipeline {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SdfUniforms {
     // Basic uniforms (16 bytes)
-    resolution: [f32; 2],   // offset 0
-    time: f32,              // offset 8
-    _pad0: f32,             // offset 12
+    resolution: [f32; 2], // offset 0
+    time: f32,            // offset 8
+    _pad0: f32,           // offset 12
 
     // Camera position as vec4 (16 bytes)
-    camera_pos: [f32; 4],   // offset 16 (xyz used, w unused)
+    camera_pos: [f32; 4], // offset 16 (xyz used, w unused)
 
     // Camera target + fov as vec4 (16 bytes)
     camera_target: [f32; 4], // offset 32 (xyz = target, w = fov)
 
     // Camera up as vec4 (16 bytes)
-    camera_up: [f32; 4],    // offset 48 (xyz used, w unused)
+    camera_up: [f32; 4], // offset 48 (xyz used, w unused)
 
     // Raymarching settings (16 bytes)
-    max_steps: u32,         // offset 64
-    max_distance: f32,      // offset 68
-    epsilon: f32,           // offset 72
-    flags: u32,             // offset 76
+    max_steps: u32,    // offset 64
+    max_distance: f32, // offset 68
+    epsilon: f32,      // offset 72
+    flags: u32,        // offset 76
 
     // Scene selection (16 bytes for alignment)
     scene_id: u32,          // offset 80
@@ -194,8 +202,8 @@ pub struct SdfUniforms {
     _pad3: u32,             // offset 92
 
     // Lighting direction + bg color (32 bytes)
-    light_dir: [f32; 4],    // offset 96  (xyz = dir, w = unused)
-    bg_color: [f32; 4],     // offset 112 (xyz = color, w = unused)
+    light_dir: [f32; 4], // offset 96  (xyz = dir, w = unused)
+    bg_color: [f32; 4],  // offset 112 (xyz = color, w = unused)
 }
 
 /// Base shader template for raymarching
@@ -223,12 +231,18 @@ pub struct SdfPipeline {
 }
 
 impl SdfPipeline {
+    #[must_use]
     pub fn new(device: &Device, format: TextureFormat) -> Self {
         Self::new_with_shader(device, format, RAYMARCHING_TEMPLATE, false)
     }
 
     /// Create pipeline with custom shader source
-    fn new_with_shader(device: &Device, format: TextureFormat, shader_source: &str, has_dynamic_sdf: bool) -> Self {
+    fn new_with_shader(
+        device: &Device,
+        format: TextureFormat,
+        shader_source: &str,
+        has_dynamic_sdf: bool,
+    ) -> Self {
         // Shader module
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("SDF Raymarching Shader"),
@@ -321,10 +335,11 @@ impl SdfPipeline {
     ///
     /// # Arguments
     /// * `device` - wgpu device
-    /// * `sdf_wgsl` - WGSL code for sdf_eval function (from alice_sdf::WgslShader)
+    /// * `sdf_wgsl` - WGSL code for `sdf_eval` function (from `alice_sdf::WgslShader`)
     ///
     /// # Returns
-    /// New SdfPipeline with dynamic SDF embedded
+    /// New `SdfPipeline` with dynamic SDF embedded
+    #[must_use]
     pub fn rebuild_with_dynamic_sdf(&self, device: &Device, sdf_wgsl: &str) -> Self {
         // Generate dynamic shader by replacing placeholder
         let dynamic_function = format!(
@@ -340,12 +355,15 @@ impl SdfPipeline {
             &dynamic_function,
         );
 
-        tracing::info!("Rebuilt SDF pipeline with dynamic shader ({} bytes)", shader_source.len());
+        tracing::info!(
+            "Rebuilt SDF pipeline with dynamic shader ({} bytes)",
+            shader_source.len()
+        );
 
         Self::new_with_shader(device, self.format, &shader_source, true)
     }
 
-    /// Convert sdf_eval function body to sdf_eval_dynamic
+    /// Convert `sdf_eval` function body to `sdf_eval_dynamic`
     /// The ALICE-SDF transpiler generates `fn sdf_eval(p: vec3<f32>) -> f32 { ... }`
     /// We need to extract the body and rename variables if needed
     fn convert_sdf_eval_to_dynamic(sdf_wgsl: &str) -> String {
@@ -419,7 +437,12 @@ impl SdfPipeline {
             ambient_intensity: state.ambient_intensity,
             _pad3: 0,
 
-            light_dir: [state.light_dir[0], state.light_dir[1], state.light_dir[2], 0.0],
+            light_dir: [
+                state.light_dir[0],
+                state.light_dir[1],
+                state.light_dir[2],
+                0.0,
+            ],
             bg_color: [state.bg_color[0], state.bg_color[1], state.bg_color[2], 1.0],
         };
 

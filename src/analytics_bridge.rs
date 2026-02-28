@@ -57,15 +57,25 @@ impl RenderMetrics {
     }
 
     /// P99 frame time (ms).
-    pub fn p99_frame_time(&self) -> f64 { self.frame_times.quantile(0.99) }
+    pub fn p99_frame_time(&self) -> f64 {
+        self.frame_times.quantile(0.99)
+    }
     /// P50 frame time (ms).
-    pub fn p50_frame_time(&self) -> f64 { self.frame_times.quantile(0.50) }
+    pub fn p50_frame_time(&self) -> f64 {
+        self.frame_times.quantile(0.50)
+    }
     /// P99 draw calls.
-    pub fn p99_draw_calls(&self) -> f64 { self.draw_calls.quantile(0.99) }
+    pub fn p99_draw_calls(&self) -> f64 {
+        self.draw_calls.quantile(0.99)
+    }
     /// P99 GPU memory (bytes).
-    pub fn p99_gpu_memory(&self) -> f64 { self.gpu_memory.quantile(0.99) }
+    pub fn p99_gpu_memory(&self) -> f64 {
+        self.gpu_memory.quantile(0.99)
+    }
     /// Estimated unique shader count.
-    pub fn unique_shader_count(&self) -> f64 { self.unique_shaders.cardinality() }
+    pub fn unique_shader_count(&self) -> f64 {
+        self.unique_shaders.cardinality()
+    }
 
     /// Check if a frame time is anomalous (e.g., stutter detection).
     pub fn is_frame_anomaly(&mut self, frame_time_ms: f64) -> bool {
@@ -75,12 +85,18 @@ impl RenderMetrics {
     /// Estimated FPS from median frame time.
     pub fn estimated_fps(&self) -> f64 {
         let median = self.p50_frame_time();
-        if median > 0.0 { 1000.0 / median } else { 0.0 }
+        if median > 0.0 {
+            1000.0 / median
+        } else {
+            0.0
+        }
     }
 }
 
 impl Default for RenderMetrics {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]

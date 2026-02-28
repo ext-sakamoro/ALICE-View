@@ -4,8 +4,8 @@
 //! Includes WGSL transpilation for GPU raymarching.
 //! Author: Moroya Sakamoto
 
+use alice_sdf::compiled::{TranspileMode, WgslShader};
 use alice_sdf::prelude::*;
-use alice_sdf::compiled::{WgslShader, TranspileMode};
 use anyhow::{Context, Result};
 use std::path::Path;
 
@@ -26,11 +26,13 @@ pub struct SdfContent {
 
 impl SdfContent {
     /// Load from .asdf or .asdf.json file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, the format is unrecognised,
+    /// or the SDF tree fails to parse.
     pub fn load(path: &Path) -> Result<Self> {
-        let extension = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         let tree = if path.to_string_lossy().ends_with(".asdf.json") {
             // Compound extension: .asdf.json
@@ -46,7 +48,7 @@ impl SdfContent {
             tracing::info!("Loading SDF JSON: {:?}", path);
             load_asdf_json(path).context("Failed to load SDF JSON")?
         } else {
-            anyhow::bail!("Unknown SDF format: {}", extension);
+            anyhow::bail!("Unknown SDF format: {extension}");
         };
 
         let node_count = tree.node_count() as usize;
@@ -57,7 +59,7 @@ impl SdfContent {
         // Get version from file info if available
         let info: Option<String> = get_info(path).ok();
         let version = info
-            .and_then(|i: String| i.lines().next().map(|s| s.to_string()))
+            .and_then(|i: String| i.lines().next().map(std::string::ToString::to_string))
             .unwrap_or_else(|| "0.1.0".to_string());
 
         Ok(Self {
@@ -104,13 +106,14 @@ impl SdfContent {
     /// Get the SDF root node
     // Available for external consumers that need direct tree access.
     #[allow(dead_code)]
+    #[must_use]
     pub fn root(&self) -> &SdfNode {
         &self.tree.root
     }
 
     /// Generate WGSL shader code for this SDF
     ///
-    /// Uses ALICE-SDF's WgslShader transpiler to convert the SDF tree
+    /// Uses ALICE-SDF's `WgslShader` transpiler to convert the SDF tree
     /// to optimized WGSL code for GPU evaluation.
     pub fn to_wgsl(&self) -> String {
         let shader = WgslShader::transpile(&self.tree.root, TranspileMode::Hardcoded);
@@ -126,6 +129,7 @@ impl SdfContent {
     /// Get the raw WGSL source with metadata
     // Returns (source, node_count, helper_count) for detailed inspection.
     #[allow(dead_code)]
+    #[must_use]
     pub fn to_wgsl_with_metadata(&self) -> (String, usize, usize) {
         let shader = WgslShader::transpile(&self.tree.root, TranspileMode::Hardcoded);
         (shader.source, self.node_count, shader.helper_count)
@@ -135,6 +139,7 @@ impl SdfContent {
 /// Check if a file is an ASDF/SDF JSON file
 // Used by file-dialog filters in external consumers.
 #[allow(dead_code)]
+#[must_use]
 pub fn is_asdf_file(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json") || path_str.ends_with(".json")

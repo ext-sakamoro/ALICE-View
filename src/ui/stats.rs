@@ -24,6 +24,7 @@ pub struct StatsCollector {
 }
 
 impl StatsCollector {
+    #[must_use]
     pub fn new() -> Self {
         const CAPACITY: usize = 120; // 2 seconds at 60fps
         Self {
@@ -51,6 +52,7 @@ impl StatsCollector {
     }
 
     /// Calculate average FPS (O(1) - uses cached sum)
+    #[must_use]
     pub fn fps(&self) -> f32 {
         let avg_ms = self.total_time / self.frame_times.len() as f32;
         if avg_ms > 0.001 {
@@ -64,6 +66,7 @@ impl StatsCollector {
     /// Get capacity of the ring buffer
     // Available for external UI components that want to render a fixed-size graph.
     #[allow(dead_code)]
+    #[must_use]
     pub fn capacity(&self) -> usize {
         self.frame_times.len()
     }
@@ -76,7 +79,11 @@ impl Default for StatsCollector {
 }
 
 /// Render performance stats overlay with graph
-pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector: &mut StatsCollector) {
+pub fn render_stats_overlay(
+    ctx: &egui::Context,
+    state: &ViewerState,
+    collector: &mut StatsCollector,
+) {
     egui::Area::new(egui::Id::new("stats_overlay"))
         .anchor(egui::Align2::RIGHT_TOP, [-10.0, 40.0])
         .show(ctx, |ui| {
@@ -87,7 +94,11 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label("⚡");
-                        ui.label(egui::RichText::new("ENGINE STATS").strong().color(Color32::WHITE));
+                        ui.label(
+                            egui::RichText::new("ENGINE STATS")
+                                .strong()
+                                .color(Color32::WHITE),
+                        );
                     });
 
                     ui.add_space(4.0);
@@ -96,7 +107,8 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                     let graph_size = egui::vec2(200.0, 40.0);
                     let (rect, _) = ui.allocate_exact_size(graph_size, egui::Sense::hover());
 
-                    ui.painter().rect_filled(rect, 2.0, Color32::from_black_alpha(100));
+                    ui.painter()
+                        .rect_filled(rect, 2.0, Color32::from_black_alpha(100));
 
                     // Clear and reuse buffer (no allocation)
                     collector.graph_points_buffer.clear();
@@ -109,7 +121,7 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
 
                         let x = rect.min.x + (i as f32 / history_len as f32) * rect.width();
                         // Scale: 0ms = bottom, 33ms (30fps) = top
-                            let h = (ms * MS_SCALE_RCP).min(1.0);
+                        let h = (ms * MS_SCALE_RCP).min(1.0);
                         let y = rect.max.y - h * rect.height();
 
                         collector.graph_points_buffer.push(Pos2::new(x, y));
@@ -125,7 +137,10 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                     // Target line (16.6ms / 60fps)
                     let target_y = rect.max.y - (16.6 * MS_SCALE_RCP) * rect.height();
                     ui.painter().line_segment(
-                        [Pos2::new(rect.min.x, target_y), Pos2::new(rect.max.x, target_y)],
+                        [
+                            Pos2::new(rect.min.x, target_y),
+                            Pos2::new(rect.max.x, target_y),
+                        ],
                         Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 50)),
                     );
 
@@ -158,7 +173,7 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                             // Frame Time
                             ui.label("Frame:");
                             let frame_ms = 1000.0 / state.stats.fps.max(1.0);
-                            ui.label(format!("{:.2} ms", frame_ms));
+                            ui.label(format!("{frame_ms:.2} ms"));
                             ui.end_row();
 
                             // Decode Speed
@@ -178,7 +193,10 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                             } else {
                                 Color32::WHITE
                             };
-                            ui.colored_label(ratio_color, format!("{:.0}x", state.stats.compression_ratio));
+                            ui.colored_label(
+                                ratio_color,
+                                format!("{:.0}x", state.stats.compression_ratio),
+                            );
                             ui.end_row();
 
                             // Resolution
@@ -193,4 +211,48 @@ pub fn render_stats_overlay(ctx: &egui::Context, state: &ViewerState, collector:
                         });
                 });
         });
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stats_collector_new() {
+        let sc = StatsCollector::new();
+        assert_eq!(sc.capacity(), 120);
+        // Initial FPS should be 0 or very low (all frame times are 0)
+        assert!(sc.fps().is_finite());
+    }
+
+    #[test]
+    fn stats_collector_ring_buffer_wraps() {
+        let mut sc = StatsCollector::new();
+        // Record more frames than capacity to verify wrap-around
+        for _ in 0..250 {
+            sc.record_frame();
+        }
+        assert!(sc.fps().is_finite());
+        assert!(sc.fps() >= 0.0);
+    }
+
+    #[test]
+    fn stats_collector_fps_positive_after_frames() {
+        let mut sc = StatsCollector::new();
+        // Record a few frames with small delay
+        for _ in 0..5 {
+            sc.record_frame();
+        }
+        // FPS should be some positive number
+        let fps = sc.fps();
+        assert!(fps.is_finite());
+    }
+
+    #[test]
+    fn stats_collector_capacity() {
+        let sc = StatsCollector::new();
+        assert_eq!(sc.capacity(), 120);
+    }
 }

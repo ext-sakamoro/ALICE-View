@@ -16,14 +16,16 @@ pub enum ExportFormat {
 }
 
 impl ExportFormat {
-    pub fn extension(&self) -> &'static str {
+    #[must_use]
+    pub fn extension(self) -> &'static str {
         match self {
             ExportFormat::Glb => "glb",
             ExportFormat::Obj => "obj",
         }
     }
 
-    pub fn filter_name(&self) -> &'static str {
+    #[must_use]
+    pub fn filter_name(self) -> &'static str {
         match self {
             ExportFormat::Glb => "glTF Binary",
             ExportFormat::Obj => "Wavefront OBJ",
@@ -51,9 +53,11 @@ pub fn export_mesh(
     let bounds = sdf_content.bounds;
 
     thread::spawn(move || {
-        let _ = status_tx.send(ExportStatus::Started(
-            format!("Exporting as .{} (res={})", format.extension(), resolution),
-        ));
+        let _ = status_tx.send(ExportStatus::Started(format!(
+            "Exporting as .{} (res={})",
+            format.extension(),
+            resolution
+        )));
 
         // Show save dialog
         let save_path = rfd::FileDialog::new()
@@ -61,27 +65,57 @@ pub fn export_mesh(
             .set_file_name(format!("export.{}", format.extension()))
             .save_file();
 
-        let path = match save_path {
-            Some(p) => p,
-            None => {
-                let _ = status_tx.send(ExportStatus::Error("Export cancelled".to_string()));
-                return;
-            }
+        let Some(path) = save_path else {
+            let _ = status_tx.send(ExportStatus::Error("Export cancelled".to_string()));
+            return;
         };
 
         let _ = status_tx.send(ExportStatus::Progress("Generating mesh...".to_string()));
 
         match generate_and_save(&tree, bounds, resolution, &path, format) {
             Ok(info) => {
-                let _ = status_tx.send(ExportStatus::Done(
-                    format!("Saved: {} ({})", path.display(), info),
-                ));
+                let _ = status_tx.send(ExportStatus::Done(format!(
+                    "Saved: {} ({})",
+                    path.display(),
+                    info
+                )));
             }
             Err(e) => {
-                let _ = status_tx.send(ExportStatus::Error(format!("Export failed: {}", e)));
+                let _ = status_tx.send(ExportStatus::Error(format!("Export failed: {e}")));
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_format_glb_extension() {
+        assert_eq!(ExportFormat::Glb.extension(), "glb");
+    }
+
+    #[test]
+    fn export_format_obj_extension() {
+        assert_eq!(ExportFormat::Obj.extension(), "obj");
+    }
+
+    #[test]
+    fn export_format_glb_filter_name() {
+        assert_eq!(ExportFormat::Glb.filter_name(), "glTF Binary");
+    }
+
+    #[test]
+    fn export_format_obj_filter_name() {
+        assert_eq!(ExportFormat::Obj.filter_name(), "Wavefront OBJ");
+    }
+
+    #[test]
+    fn export_format_equality() {
+        assert_eq!(ExportFormat::Glb, ExportFormat::Glb);
+        assert_ne!(ExportFormat::Glb, ExportFormat::Obj);
+    }
 }
 
 fn generate_and_save(
@@ -115,5 +149,5 @@ fn generate_and_save(
         }
     }
 
-    Ok(format!("{} vertices, {} triangles", vertex_count, tri_count))
+    Ok(format!("{vertex_count} vertices, {tri_count} triangles"))
 }

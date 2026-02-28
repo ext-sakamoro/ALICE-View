@@ -3,7 +3,7 @@
 //! Query time-series data from ALICE-DB and convert to renderable
 //! plot data for GPU visualization.
 
-use alice_db::{AliceDB, Aggregation, StorageStats};
+use alice_db::{Aggregation, AliceDB, StorageStats};
 
 /// Time-series plot data ready for GPU rendering.
 #[derive(Clone, Debug)]
@@ -61,10 +61,18 @@ pub fn query_plot_series(
         .map(|&(t, v)| {
             let x = t as f32;
             let y = v;
-            if x < x_min { x_min = x; }
-            if x > x_max { x_max = x; }
-            if y < y_min { y_min = y; }
-            if y > y_max { y_max = y; }
+            if x < x_min {
+                x_min = x;
+            }
+            if x > x_max {
+                x_max = x;
+            }
+            if y < y_min {
+                y_min = y;
+            }
+            if y > y_max {
+                y_max = y;
+            }
             [x, y]
         })
         .collect();
@@ -110,10 +118,18 @@ pub fn query_downsampled_series(
         .map(|&(t, v)| {
             let x = t as f32;
             let y = v as f32;
-            if x < x_min { x_min = x; }
-            if x > x_max { x_max = x; }
-            if y < y_min { y_min = y; }
-            if y > y_max { y_max = y; }
+            if x < x_min {
+                x_min = x;
+            }
+            if x > x_max {
+                x_max = x;
+            }
+            if y < y_min {
+                y_min = y;
+            }
+            if y > y_max {
+                y_max = y;
+            }
             [x, y]
         })
         .collect();
@@ -184,10 +200,8 @@ mod tests {
     fn test_query_downsampled_series() {
         let (_dir, db) = make_test_db();
 
-        let series = query_downsampled_series(
-            &db, 0, 199, 50, Aggregation::Avg, "ramp_avg",
-        )
-        .unwrap();
+        let series =
+            query_downsampled_series(&db, 0, 199, 50, Aggregation::Avg, "ramp_avg").unwrap();
         assert_eq!(series.label, "ramp_avg");
         // 200 points / 50 interval = ~4 buckets
         assert!(series.points.len() >= 2 && series.points.len() <= 6);

@@ -62,13 +62,14 @@ impl TryFrom<u8> for AliceContentType {
             4 => Ok(Self::Fourier),
             5 => Ok(Self::Voronoi),
             6 => Ok(Self::SineWave),
-            _ => bail!("Unknown content type: {}", value),
+            _ => bail!("Unknown content type: {value}"),
         }
     }
 }
 
 impl AliceContentType {
-    pub fn name(&self) -> &'static str {
+    #[must_use]
+    pub fn name(self) -> &'static str {
         match self {
             Self::Linear => "Linear",
             Self::Polynomial => "Polynomial",
@@ -101,6 +102,11 @@ impl AliceHeader {
     pub const SIZE: usize = 32;
 
     /// Parse header from bytes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is too short, the magic bytes are invalid,
+    /// or the content-type byte is unrecognised.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < Self::SIZE {
             bail!(
@@ -114,7 +120,7 @@ impl AliceHeader {
         magic.copy_from_slice(&data[0..5]);
 
         if &magic != ALICE_MAGIC {
-            bail!("Invalid magic: {:?} (expected {:?})", magic, ALICE_MAGIC);
+            bail!("Invalid magic: {magic:?} (expected {ALICE_MAGIC:?})");
         }
 
         let version = data[5];
@@ -136,6 +142,7 @@ impl AliceHeader {
     }
 
     /// Serialize header to bytes
+    #[must_use]
     pub fn to_bytes(&self) -> [u8; Self::SIZE] {
         let mut buf = [0u8; Self::SIZE];
         buf[0..5].copy_from_slice(&self.magic);
@@ -149,11 +156,13 @@ impl AliceHeader {
     }
 
     /// Check if file has metadata
+    #[must_use]
     pub fn has_metadata(&self) -> bool {
         self.metadata_length > 0
     }
 
     /// Get compression ratio
+    #[must_use]
     pub fn compression_ratio(&self) -> f64 {
         if self.compressed_size > 0 {
             self.original_size as f64 / self.compressed_size as f64
@@ -182,6 +191,11 @@ impl LinearPayload {
     pub const SIZE: usize = 12;
 
     /// Parse from bytes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is shorter than the expected payload size
+    /// or if byte-to-integer conversion fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 8 {
             bail!("Linear payload too short");
@@ -203,26 +217,29 @@ impl LinearPayload {
 
     /// Convert Q16.16 to float
     #[inline(always)]
+    #[must_use]
     pub fn slope_f32(&self) -> f32 {
         self.slope_q16 as f32 * Q16_RCP
     }
 
     #[inline(always)]
+    #[must_use]
     pub fn intercept_f32(&self) -> f32 {
         self.intercept_q16 as f32 * Q16_RCP
     }
 
     /// Get human-readable equation string
+    #[must_use]
     pub fn equation_string(&self) -> String {
         let slope = self.slope_f32();
         let intercept = self.intercept_f32();
 
         if slope.abs() < 0.0001 {
-            format!("y = {:.4}", intercept)
+            format!("y = {intercept:.4}")
         } else if intercept.abs() < 0.0001 {
-            format!("y = {:.6}x", slope)
+            format!("y = {slope:.6}x")
         } else if intercept >= 0.0 {
-            format!("y = {:.6}x + {:.4}", slope, intercept)
+            format!("y = {slope:.6}x + {intercept:.4}")
         } else {
             format!("y = {:.6}x - {:.4}", slope, intercept.abs())
         }
@@ -230,6 +247,7 @@ impl LinearPayload {
 
     /// Evaluate at point x
     #[inline(always)]
+    #[must_use]
     pub fn evaluate(&self, x: i32) -> f32 {
         let mx = (self.slope_q16 as i64).wrapping_mul(x as i64);
         let q16_val = (mx as i32).wrapping_add(self.intercept_q16);
@@ -237,6 +255,7 @@ impl LinearPayload {
     }
 
     /// Serialize to bytes
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(Self::SIZE);
         buf.extend_from_slice(&self.slope_q16.to_le_bytes());
@@ -261,6 +280,10 @@ pub struct PerlinPayload {
 impl PerlinPayload {
     pub const SIZE: usize = 24;
 
+    /// # Errors
+    ///
+    /// Returns an error if the data is shorter than [`Self::SIZE`] or if
+    /// byte-to-integer conversion fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < Self::SIZE {
             bail!("Perlin payload too short");
@@ -274,6 +297,7 @@ impl PerlinPayload {
         })
     }
 
+    #[must_use]
     pub fn equation_string(&self) -> String {
         format!(
             "FBM(seed={}, scale={:.2}, octaves={}, persistence={:.2}, lacunarity={:.2})",
@@ -281,6 +305,7 @@ impl PerlinPayload {
         )
     }
 
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(Self::SIZE);
         buf.extend_from_slice(&self.seed.to_le_bytes());
@@ -311,6 +336,10 @@ pub struct FractalPayload {
 impl FractalPayload {
     pub const SIZE: usize = 45;
 
+    /// # Errors
+    ///
+    /// Returns an error if the data is shorter than [`Self::SIZE`] or if
+    /// byte-to-integer conversion fails.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < Self::SIZE {
             bail!("Fractal payload too short");
@@ -326,6 +355,7 @@ impl FractalPayload {
         })
     }
 
+    #[must_use]
     pub fn fractal_name(&self) -> &'static str {
         match self.fractal_type {
             0 => "Mandelbrot",
@@ -336,6 +366,7 @@ impl FractalPayload {
         }
     }
 
+    #[must_use]
     pub fn equation_string(&self) -> String {
         match self.fractal_type {
             0 => format!(
@@ -355,6 +386,7 @@ impl FractalPayload {
         }
     }
 
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(Self::SIZE);
         buf.push(self.fractal_type);
@@ -379,6 +411,7 @@ pub enum AlicePayload {
 
 impl AlicePayload {
     /// Get human-readable equation string
+    #[must_use]
     pub fn equation_string(&self) -> String {
         match self {
             Self::Linear(p) => p.equation_string(),
@@ -409,6 +442,10 @@ pub struct AliceMetadata {
 #[allow(dead_code)]
 impl AliceMetadata {
     /// Parse from JSON bytes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is not valid UTF-8.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.is_empty() {
             return Ok(Self::default());
@@ -456,22 +493,23 @@ impl AliceMetadata {
     }
 
     /// Serialize to JSON bytes
+    #[must_use]
     pub fn to_json(&self) -> Vec<u8> {
         let mut parts = Vec::new();
         if let Some(ref id) = self.sensor_id {
-            parts.push(format!("\"sensor_id\":\"{}\"", id));
+            parts.push(format!("\"sensor_id\":\"{id}\""));
         }
         if let Some(ref ts) = self.timestamp {
-            parts.push(format!("\"timestamp\":\"{}\"", ts));
+            parts.push(format!("\"timestamp\":\"{ts}\""));
         }
         if let Some(ref loc) = self.location {
-            parts.push(format!("\"location\":\"{}\"", loc));
+            parts.push(format!("\"location\":\"{loc}\""));
         }
         if let Some(ref unit) = self.unit {
-            parts.push(format!("\"unit\":\"{}\"", unit));
+            parts.push(format!("\"unit\":\"{unit}\""));
         }
         if let Some(ref desc) = self.description {
-            parts.push(format!("\"description\":\"{}\"", desc));
+            parts.push(format!("\"description\":\"{desc}\""));
         }
         format!("{{{}}}", parts.join(",")).into_bytes()
     }
@@ -489,6 +527,11 @@ pub struct AliceFile {
 #[allow(dead_code)]
 impl AliceFile {
     /// Parse .alice file from bytes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the header is invalid, the payload bounds are
+    /// inconsistent, or any inner payload fails to parse.
     pub fn parse(data: &[u8]) -> Result<Self> {
         let header = AliceHeader::parse(data)?;
 
@@ -524,6 +567,7 @@ impl AliceFile {
     }
 
     /// Serialize to bytes
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let payload_bytes = match &self.payload {
             AlicePayload::Linear(p) => p.to_bytes(),
@@ -544,16 +588,19 @@ impl AliceFile {
     }
 
     /// Get equation string
+    #[must_use]
     pub fn equation_string(&self) -> String {
         self.payload.equation_string()
     }
 
     /// Get content type name
+    #[must_use]
     pub fn content_type_name(&self) -> &'static str {
         self.header.content_type.name()
     }
 
     /// Get compression ratio
+    #[must_use]
     pub fn compression_ratio(&self) -> f64 {
         self.header.compression_ratio()
     }
@@ -571,6 +618,7 @@ pub struct AliceFileBuilder {
 
 #[allow(dead_code)]
 impl AliceFileBuilder {
+    #[must_use]
     pub fn new(content_type: AliceContentType) -> Self {
         Self {
             content_type,
@@ -581,6 +629,7 @@ impl AliceFileBuilder {
     }
 
     /// Create from ALICE-Edge linear model output
+    #[must_use]
     pub fn from_linear(slope_q16: i32, intercept_q16: i32, sample_count: u32) -> Self {
         let mut builder = Self::new(AliceContentType::Linear);
         builder.original_size = sample_count as u64 * 4; // 4 bytes per sample
@@ -593,6 +642,7 @@ impl AliceFileBuilder {
     }
 
     /// Create Mandelbrot fractal
+    #[must_use]
     pub fn mandelbrot(max_iterations: u32, center_x: f64, center_y: f64) -> Self {
         let mut builder = Self::new(AliceContentType::Fractal);
         builder.payload = Some(AlicePayload::Fractal(FractalPayload {
@@ -608,6 +658,7 @@ impl AliceFileBuilder {
     }
 
     /// Create Julia set
+    #[must_use]
     pub fn julia(max_iterations: u32, cx: f64, cy: f64) -> Self {
         let mut builder = Self::new(AliceContentType::Fractal);
         builder.payload = Some(AlicePayload::Fractal(FractalPayload {
@@ -623,6 +674,7 @@ impl AliceFileBuilder {
     }
 
     /// Create Perlin noise
+    #[must_use]
     pub fn perlin(seed: u64, scale: f32, octaves: u32) -> Self {
         let mut builder = Self::new(AliceContentType::Perlin);
         builder.payload = Some(AlicePayload::Perlin(PerlinPayload {
@@ -636,30 +688,38 @@ impl AliceFileBuilder {
     }
 
     /// Set metadata
+    #[must_use]
     pub fn with_metadata(mut self, metadata: AliceMetadata) -> Self {
         self.metadata = metadata;
         self
     }
 
     /// Set sensor ID
+    #[must_use]
     pub fn sensor_id(mut self, id: &str) -> Self {
         self.metadata.sensor_id = Some(id.to_string());
         self
     }
 
     /// Set timestamp
+    #[must_use]
     pub fn timestamp(mut self, ts: &str) -> Self {
         self.metadata.timestamp = Some(ts.to_string());
         self
     }
 
     /// Set unit
+    #[must_use]
     pub fn unit(mut self, unit: &str) -> Self {
         self.metadata.unit = Some(unit.to_string());
         self
     }
 
     /// Build the .alice file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no payload has been set before calling `build`.
     pub fn build(self) -> Result<AliceFile> {
         let payload = self.payload.context("Payload not set")?;
 

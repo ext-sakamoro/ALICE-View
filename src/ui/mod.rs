@@ -4,22 +4,22 @@
 //! - Zero-allocation stats collection
 //! - Async file dialog (non-blocking)
 
-mod viewport;
-mod xray;
-mod stats;
+pub mod export;
 pub mod file_info;
 pub mod sdf_panel;
-pub mod export;
+mod stats;
+mod viewport;
+mod xray;
 
 // viewport and xray exports are public API; items may be unused within this
 // crate's binary but are available to external embedders.
+pub use export::*;
+pub use file_info::*;
+pub use sdf_panel::*;
+pub use stats::*;
 #[allow(unused_imports)]
 pub use viewport::*;
 pub use xray::*;
-pub use stats::*;
-pub use file_info::*;
-pub use sdf_panel::*;
-pub use export::*;
 
 use crate::app::{RenderMode, ViewerState, XRayType};
 use crate::decoder::Decoder;
@@ -54,6 +54,7 @@ pub struct Ui {
 }
 
 impl Ui {
+    #[must_use]
     pub fn new() -> Self {
         let (tx, rx) = channel();
         let (etx, erx) = channel();
@@ -73,6 +74,7 @@ impl Ui {
     }
 
     /// Get current SDF scene ID for shader
+    #[must_use]
     pub fn sdf_scene_id(&self) -> u32 {
         self.sdf_panel.scene_id()
     }
@@ -80,12 +82,18 @@ impl Ui {
     /// Get current file info
     // Available for external embedders that render file info in their own UI.
     #[allow(dead_code)]
+    #[must_use]
     pub fn file_info(&self) -> Option<&FileInfo> {
         self.current_file_info.as_ref()
     }
 
     /// Handle window events
-    pub fn handle_event(&mut self, _event: &WindowEvent, _ctx: &egui::Context) -> egui_winit::EventResponse {
+    #[allow(clippy::unused_self)]
+    pub fn handle_event(
+        &mut self,
+        _event: &WindowEvent,
+        _ctx: &egui::Context,
+    ) -> egui_winit::EventResponse {
         egui_winit::EventResponse {
             consumed: false,
             repaint: false,
@@ -95,7 +103,12 @@ impl Ui {
     /// Start mesh export
     pub fn start_export(&self, decoder: &Decoder, format: ExportFormat, resolution: u32) {
         if let Some(sdf_content) = decoder.sdf_content() {
-            export::export_mesh(sdf_content, format, resolution, self.export_status_tx.clone());
+            export::export_mesh(
+                sdf_content,
+                format,
+                resolution,
+                self.export_status_tx.clone(),
+            );
         }
     }
 
@@ -162,7 +175,8 @@ impl Ui {
 
                 // Update file info if alice file was loaded
                 if let Some(alice_file) = decoder.alice_file() {
-                    self.current_file_info = Some(FileInfo::from_alice_file(alice_file, Some(&path)));
+                    self.current_file_info =
+                        Some(FileInfo::from_alice_file(alice_file, Some(&path)));
                     self.file_info_open = true; // Auto-open file info panel
                     tracing::info!("File info updated: {}", alice_file.equation_string());
                 } else {
@@ -242,13 +256,19 @@ impl Ui {
                         "📄 File Info (F3) - No file loaded"
                     };
                     ui.add_enabled_ui(has_file, |ui| {
-                        if ui.checkbox(&mut self.file_info_open, file_info_label).clicked() {
+                        if ui
+                            .checkbox(&mut self.file_info_open, file_info_label)
+                            .clicked()
+                        {
                             ui.close_menu();
                         }
                     });
 
                     // Stats Overlay (F2)
-                    if ui.checkbox(&mut state.show_stats, "📊 Performance Stats (F2)").clicked() {
+                    if ui
+                        .checkbox(&mut state.show_stats, "📊 Performance Stats (F2)")
+                        .clicked()
+                    {
                         ui.close_menu();
                     }
 
@@ -256,7 +276,10 @@ impl Ui {
                     ui.label(egui::RichText::new("Display").strong());
 
                     // X-Ray Mode (F1)
-                    if ui.checkbox(&mut state.xray_mode, "🔬 X-Ray Mode (F1)").clicked() {
+                    if ui
+                        .checkbox(&mut state.xray_mode, "🔬 X-Ray Mode (F1)")
+                        .clicked()
+                    {
                         ui.close_menu();
                     }
 
@@ -269,9 +292,17 @@ impl Ui {
                     ui.label(egui::RichText::new("X-Ray Type (Tab)").strong());
 
                     // Radio buttons for X-Ray mode selection
-                    ui.radio_value(&mut state.xray_type, XRayType::MotionVectors, "🌊 Motion Vectors");
+                    ui.radio_value(
+                        &mut state.xray_type,
+                        XRayType::MotionVectors,
+                        "🌊 Motion Vectors",
+                    );
                     ui.radio_value(&mut state.xray_type, XRayType::FftHeatmap, "🔥 FFT Heatmap");
-                    ui.radio_value(&mut state.xray_type, XRayType::EquationOverlay, "📐 Equation Overlay");
+                    ui.radio_value(
+                        &mut state.xray_type,
+                        XRayType::EquationOverlay,
+                        "📐 Equation Overlay",
+                    );
                     ui.radio_value(&mut state.xray_type, XRayType::Wireframe, "🕸️ Wireframe");
 
                     ui.separator();
@@ -297,7 +328,9 @@ impl Ui {
                         ui.label(format!("Zoom: {:.2}x", state.zoom));
                     }
                     RenderMode::Sdf3D => {
-                        ui.label(egui::RichText::new("3D").color(egui::Color32::from_rgb(100, 200, 255)));
+                        ui.label(
+                            egui::RichText::new("3D").color(egui::Color32::from_rgb(100, 200, 255)),
+                        );
                         ui.separator();
                         ui.label(format!("Steps: {}", state.sdf_max_steps));
                     }
@@ -311,7 +344,9 @@ impl Ui {
                 }
                 if state.xray_mode {
                     ui.separator();
-                    ui.label(egui::RichText::new("🔬 X-RAY").color(egui::Color32::from_rgb(0, 255, 255)));
+                    ui.label(
+                        egui::RichText::new("🔬 X-RAY").color(egui::Color32::from_rgb(0, 255, 255)),
+                    );
                 }
                 if state.show_stats {
                     ui.separator();
@@ -320,7 +355,10 @@ impl Ui {
                 // Show equation in status bar if file loaded
                 if let Some(ref info) = self.current_file_info {
                     ui.separator();
-                    ui.label(egui::RichText::new(format!("📐 {}", info.equation)).color(egui::Color32::from_rgb(255, 200, 100)));
+                    ui.label(
+                        egui::RichText::new(format!("📐 {}", info.equation))
+                            .color(egui::Color32::from_rgb(255, 200, 100)),
+                    );
                 }
             });
         });
@@ -368,7 +406,9 @@ impl Ui {
                         ui.add_space(5.0);
                         ui.label("Author: Moroya Sakamoto");
                         ui.add_space(10.0);
-                        ui.label(egui::RichText::new("\"See the Math. Not the Pixels.\"").italics());
+                        ui.label(
+                            egui::RichText::new("\"See the Math. Not the Pixels.\"").italics(),
+                        );
                         ui.add_space(10.0);
                         ui.hyperlink("https://github.com/ext-sakamoro/ALICE-View");
                         ui.add_space(10.0);
@@ -384,7 +424,9 @@ impl Ui {
             let (msg, color) = match status {
                 ExportStatus::Done(m) => (m.as_str(), egui::Color32::GREEN),
                 ExportStatus::Error(m) => (m.as_str(), egui::Color32::RED),
-                ExportStatus::Started(m) | ExportStatus::Progress(m) => (m.as_str(), egui::Color32::YELLOW),
+                ExportStatus::Started(m) | ExportStatus::Progress(m) => {
+                    (m.as_str(), egui::Color32::YELLOW)
+                }
             };
             egui::TopBottomPanel::bottom("export_status").show(ctx, |ui| {
                 ui.horizontal(|ui| {

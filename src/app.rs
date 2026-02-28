@@ -49,12 +49,14 @@ impl Default for Camera3D {
 impl Camera3D {
     /// Get view direction (normalized)
     #[inline(always)]
+    #[must_use]
     pub fn forward(&self) -> Vec3 {
         (self.target - self.position).normalize()
     }
 
     /// Get right vector (normalized)
     #[inline(always)]
+    #[must_use]
     pub fn right(&self) -> Vec3 {
         self.forward().cross(self.up).normalize()
     }
@@ -132,6 +134,7 @@ pub struct App {
 }
 
 /// Viewer state
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Default)]
 pub struct ViewerState {
     // 2D controls (legacy)
@@ -166,6 +169,7 @@ pub struct ViewerState {
 }
 
 impl ViewerState {
+    #[must_use]
     pub fn new(render_mode: RenderMode, show_stats: bool) -> Self {
         Self {
             zoom: 1.0,
@@ -266,6 +270,7 @@ impl Default for ViewerConfig {
 #[allow(dead_code)] // Public library API — unused by the binary
 impl ViewerConfig {
     /// Create config for displaying temperature data visualization
+    #[must_use]
     pub fn for_temperature_data() -> Self {
         Self {
             title: "ALICE-View - Temperature Visualization".to_string(),
@@ -275,6 +280,7 @@ impl ViewerConfig {
     }
 
     /// Create config for fractal exploration
+    #[must_use]
     pub fn for_fractal() -> Self {
         Self {
             title: "ALICE-View - Fractal Explorer".to_string(),
@@ -285,6 +291,7 @@ impl ViewerConfig {
     }
 
     /// Create minimal viewer for embedding
+    #[must_use]
     pub fn minimal() -> Self {
         Self {
             title: "ALICE-View".to_string(),
@@ -295,6 +302,7 @@ impl ViewerConfig {
     }
 
     /// Create config for viewing an SDF file
+    #[must_use]
     pub fn for_sdf_file(path: &str) -> Self {
         Self {
             title: format!(
@@ -314,18 +322,17 @@ impl App {
     // App::new is the public library entry point; the binary uses with_config()
     // but external embedders call new() directly.
     #[allow(dead_code)]
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
+    #[must_use]
     pub fn new(initial_file: Option<String>) -> Self {
         // Auto-detect render mode from file extension
-        let render_mode = initial_file
-            .as_ref()
-            .map(|f| {
-                if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
-                    RenderMode::Sdf3D
-                } else {
-                    RenderMode::Procedural2D
-                }
-            })
-            .unwrap_or(RenderMode::Procedural2D);
+        let render_mode = initial_file.as_ref().map_or(RenderMode::Procedural2D, |f| {
+            if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
+                RenderMode::Sdf3D
+            } else {
+                RenderMode::Procedural2D
+            }
+        });
 
         Self {
             window: None,
@@ -341,19 +348,20 @@ impl App {
     }
 
     /// Create App with custom configuration (for library usage)
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
+    #[must_use]
     pub fn with_config(config: ViewerConfig) -> Self {
         // Auto-detect render mode from file extension
         let render_mode = config
             .initial_file
             .as_ref()
-            .map(|f| {
+            .map_or(RenderMode::Procedural2D, |f| {
                 if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") {
                     RenderMode::Sdf3D
                 } else {
                     RenderMode::Procedural2D
                 }
-            })
-            .unwrap_or(RenderMode::Procedural2D);
+            });
 
         Self {
             window: None,
@@ -369,6 +377,10 @@ impl App {
     }
 
     /// Init window and renderer
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS window cannot be created or if no suitable GPU adapter is found.
     pub fn init(&mut self, target: &EventLoopWindowTarget<()>) {
         if self.window.is_some() {
             return;
@@ -539,6 +551,10 @@ impl App {
     }
 
     /// Main event handling logic (winit 0.29 style)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the renderer has not been initialised before a render request arrives.
     pub fn handle_event(&mut self, event: Event<()>, target: &EventLoopWindowTarget<()>) {
         // Handle UI events first
         if let (

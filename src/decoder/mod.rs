@@ -1,7 +1,7 @@
 //! Decoder module for ALICE formats (Async & Optimized)
 //!
 //! - Async I/O to avoid blocking UI thread
-//! - spawn_blocking for heavy image decode
+//! - `spawn_blocking` for heavy image decode
 //! - `Arc<Vec<u8>>` for zero-copy raster data
 
 pub mod alice;
@@ -115,6 +115,7 @@ pub struct Decoder {
 // called within this crate's binary targets.
 #[allow(dead_code)]
 impl Decoder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             content_type: ContentType::None,
@@ -128,17 +129,23 @@ impl Decoder {
     }
 
     /// Get loaded SDF content (if available)
+    #[must_use]
     pub fn sdf_content(&self) -> Option<&asdf::SdfContent> {
         self.sdf_content.as_ref()
     }
 
     /// Get loaded ALICE file (if available)
+    #[must_use]
     pub fn alice_file(&self) -> Option<&alice::AliceFile> {
         self.alice_file.as_ref()
     }
 
     /// Load content from file path (synchronous wrapper for compatibility)
-    /// For async loading, use load_async() instead
+    /// For async loading, use `load_async()` instead
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or the format is not supported.
     pub fn load(&mut self, path: &str) -> Result<()> {
         let p = Path::new(path);
         let ext = p
@@ -190,6 +197,11 @@ impl Decoder {
     }
 
     /// Load content asynchronously (non-blocking)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, the format is unsupported,
+    /// or an async I/O task fails.
     pub async fn load_async(&mut self, path: &str) -> Result<()> {
         let path = Path::new(path);
         let path_buf = path.to_path_buf();
@@ -222,7 +234,7 @@ impl Decoder {
             "mp4" | "webm" | "avi" | "mov" => {
                 anyhow::bail!("Video playback not yet implemented");
             }
-            _ => anyhow::bail!("Unknown file format: {}", extension),
+            _ => anyhow::bail!("Unknown file format: {extension}"),
         };
 
         self.content = Some(content);
@@ -307,7 +319,6 @@ impl Decoder {
                 },
                 alice::AlicePayload::Fractal(p) => ProceduralContent::Fractal {
                     fractal_type: match p.fractal_type {
-                        0 => FractalType::Mandelbrot,
                         1 => FractalType::Julia,
                         2 => FractalType::BurningShip,
                         3 => FractalType::Tricorn,
@@ -386,7 +397,7 @@ impl Decoder {
         ))
     }
 
-    /// Load standard image (Async + spawn_blocking for heavy decode)
+    /// Load standard image (Async + `spawn_blocking` for heavy decode)
     async fn load_image_async(path: PathBuf) -> Result<(ProceduralContent, ContentType, u64, u64)> {
         tracing::info!("Loading image (Async): {:?}", path);
 
@@ -424,21 +435,25 @@ impl Decoder {
     }
 
     /// Get content type
+    #[must_use]
     pub fn content_type(&self) -> ContentType {
         self.content_type
     }
 
     /// Get procedural content
+    #[must_use]
     pub fn content(&self) -> Option<&ProceduralContent> {
         self.content.as_ref()
     }
 
     /// Get file path
+    #[must_use]
     pub fn file_path(&self) -> Option<&str> {
         self.file_path.as_deref()
     }
 
     /// Get compression ratio
+    #[must_use]
     pub fn compression_ratio(&self) -> f32 {
         if self.compressed_size > 0 {
             self.original_size as f32 / self.compressed_size as f32
@@ -448,14 +463,17 @@ impl Decoder {
     }
 
     /// Check if content is procedural (infinite zoom capable)
+    #[must_use]
     pub fn is_procedural(&self) -> bool {
         matches!(
             self.content,
-            Some(ProceduralContent::Perlin { .. })
-                | Some(ProceduralContent::Polynomial { .. })
-                | Some(ProceduralContent::SineWave { .. })
-                | Some(ProceduralContent::Fourier { .. })
-                | Some(ProceduralContent::Fractal { .. })
+            Some(
+                ProceduralContent::Perlin { .. }
+                    | ProceduralContent::Polynomial { .. }
+                    | ProceduralContent::SineWave { .. }
+                    | ProceduralContent::Fourier { .. }
+                    | ProceduralContent::Fractal { .. }
+            )
         )
     }
 }

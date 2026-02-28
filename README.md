@@ -5,9 +5,11 @@
 <h1 align="center">ALICE-View</h1>
 
 <p align="center">
-  <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.2.0-blue.svg" alt="Version"></a>
+  <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.2.1-blue.svg" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.75+-orange.svg" alt="Rust"></a>
+  <a href="#quality"><img src="https://img.shields.io/badge/clippy-pedantic%200-brightgreen.svg" alt="Clippy"></a>
+  <a href="#quality"><img src="https://img.shields.io/badge/tests-68%20pass-brightgreen.svg" alt="Tests"></a>
 </p>
 
 > **The Infinite Canvas**
@@ -157,7 +159,7 @@ Options:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                       ALICE-View v0.2.0                      │
+│                       ALICE-View v0.2.1                      │
 ├──────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐  │
 │  │   Decoder    │  │   Renderer    │  │       UI         │  │
@@ -220,6 +222,7 @@ ALICE-View connects to other ALICE ecosystem crates via feature-gated bridge mod
 |--------|---------|--------------|-------------|
 | `analytics_bridge` | `analytics` | [ALICE-Analytics](../ALICE-Analytics) | Real-time rendering performance analytics |
 | `physics_bridge` | `physics` | [ALICE-Physics](../ALICE-Physics) | Interactive physics debug overlay visualization |
+| `db_bridge` | `db` | [ALICE-DB](../ALICE-DB) | Time-series DB query to plot data for GPU overlay |
 
 ### Cargo Profile
 
@@ -229,11 +232,21 @@ Standardized `[profile.bench]` added for consistent benchmarking across ALICE cr
 
 | Project | Description |
 |---------|-------------|
-| [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF) | SDF library with 36 primitives, SIMD eval, mesh export, WGSL/HLSL/GLSL transpilers |
+| [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF) | SDF library with 126 primitives/ops, SIMD eval, mesh export, WGSL/HLSL/GLSL transpilers |
+| [Open Source SDF Assets](https://github.com/ext-sakamoro/Open-Source-SDF-Assets) | 991 free CC0 3D assets in .asdf.json format |
 | [ALICE-Zip](https://github.com/ext-sakamoro/ALICE-Zip) | Core procedural compression engine |
 | [ALICE-DB](https://github.com/ext-sakamoro/ALICE-DB) | Model-based time-series database |
 | [ALICE-Edge](https://github.com/ext-sakamoro/ALICE-Edge) | Embedded/IoT model generator (no_std) |
 | [ALICE-Streaming-Protocol](https://github.com/ext-sakamoro/ALICE-Streaming-Protocol) | Ultra-low bandwidth video streaming |
+
+## Quality
+
+| Gate | Status |
+|------|--------|
+| `cargo clippy -- -W clippy::pedantic` | **0 warnings** |
+| `cargo doc --no-deps` | **0 warnings** |
+| `cargo fmt -- --check` | **0 diff** |
+| `cargo test --lib` | **68 passed, 0 failed** |
 
 ## License
 

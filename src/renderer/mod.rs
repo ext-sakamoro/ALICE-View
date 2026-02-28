@@ -1,7 +1,7 @@
 //! wgpu-based renderer for procedural content
 
-mod pipeline;
 mod infinite_zoom;
+mod pipeline;
 
 pub use pipeline::*;
 // infinite_zoom exports are public API for external consumers.
@@ -12,12 +12,21 @@ use crate::app::{RenderMode, ViewerState};
 use crate::decoder::Decoder;
 use crate::ui::Ui;
 use anyhow::Result;
-use std::sync::Arc;
-use wgpu::*;
-use winit::{dpi::PhysicalSize, window::Window};
 use image::RgbaImage;
+use std::sync::Arc;
+use wgpu::{
+    Backends, BufferDescriptor, BufferUsages, Color, CommandEncoderDescriptor, Device,
+    DeviceDescriptor, Extent3d, Features, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout,
+    Instance, InstanceDescriptor, Limits, LoadOp, Maintain, MapMode, Operations, Origin3d,
+    PowerPreference, PresentMode, Queue, RenderPassColorAttachment, RenderPassDescriptor,
+    RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, SurfaceError, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor,
+    COPY_BYTES_PER_ROW_ALIGNMENT,
+};
+use winit::{dpi::PhysicalSize, window::Window};
 
 /// Main renderer
+#[allow(clippy::struct_field_names)]
 pub struct Renderer {
     surface: Surface<'static>,
     device: Device,
@@ -38,6 +47,12 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    /// Create a new renderer for the given window.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no suitable GPU adapter is found or device
+    /// initialisation fails.
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
 
@@ -102,13 +117,7 @@ impl Renderer {
 
         let egui_ctx = egui::Context::default();
         let viewport_id = egui_ctx.viewport_id();
-        let egui_state = egui_winit::State::new(
-            egui_ctx.clone(),
-            viewport_id,
-            &window,
-            None,
-            None,
-        );
+        let egui_state = egui_winit::State::new(egui_ctx.clone(), viewport_id, &window, None, None);
         let egui_renderer = egui_wgpu::Renderer::new(&device, surface_format, None, 1);
 
         Ok(Self {
@@ -144,7 +153,9 @@ impl Renderer {
     /// This allows loading arbitrary SDF trees and rendering them in real-time.
     pub fn rebuild_sdf_pipeline_with_wgsl(&mut self, sdf_wgsl: &str) {
         tracing::info!("Rebuilding SDF pipeline with dynamic shader...");
-        self.sdf_pipeline = self.sdf_pipeline.rebuild_with_dynamic_sdf(&self.device, sdf_wgsl);
+        self.sdf_pipeline = self
+            .sdf_pipeline
+            .rebuild_with_dynamic_sdf(&self.device, sdf_wgsl);
         tracing::info!("SDF pipeline rebuilt successfully");
     }
 
@@ -156,6 +167,11 @@ impl Renderer {
     }
 
     /// Capture screenshot of the current frame
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the GPU buffer mapping fails or the image cannot be
+    /// saved to disk.
     pub fn capture_screenshot(&self) -> Result<()> {
         let width = self.size.width;
         let height = self.size.height;
@@ -163,7 +179,11 @@ impl Renderer {
         // Create a texture to copy into
         let _texture = self.device.create_texture(&TextureDescriptor {
             label: Some("Screenshot Texture"),
-            size: Extent3d { width, height, depth_or_array_layers: 1 },
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
@@ -186,9 +206,11 @@ impl Renderer {
 
         // Get current surface texture and copy
         let output = self.surface.get_current_texture()?;
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Screenshot Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Screenshot Encoder"),
+            });
 
         encoder.copy_texture_to_buffer(
             ImageCopyTexture {
@@ -205,7 +227,11 @@ impl Renderer {
                     rows_per_image: Some(height),
                 },
             },
-            Extent3d { width, height, depth_or_array_layers: 1 },
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
         );
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -234,7 +260,7 @@ impl Renderer {
 
         // Save to file
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-        let filename = format!("alice-view_{}.png", timestamp);
+        let filename = format!("alice-view_{timestamp}.png");
 
         // Try Desktop, then current dir
         let save_path = dirs::desktop_dir()
@@ -249,7 +275,18 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn render(&mut self, state: &mut ViewerState, decoder: &Decoder, ui: &mut Ui) -> Result<()> {
+    /// Render a frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the surface texture cannot be acquired or the GPU
+    /// command submission fails.
+    pub fn render(
+        &mut self,
+        state: &mut ViewerState,
+        decoder: &Decoder,
+        ui: &mut Ui,
+    ) -> Result<()> {
         let output = match self.surface.get_current_texture() {
             Ok(output) => output,
             Err(SurfaceError::Outdated) => {
@@ -259,11 +296,15 @@ impl Renderer {
             Err(e) => return Err(e.into()),
         };
 
-        let view = output.texture.create_view(&TextureViewDescriptor::default());
+        let view = output
+            .texture
+            .create_view(&TextureViewDescriptor::default());
 
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         let time = self.start_time.elapsed().as_secs_f32();
         let resolution = [self.size.width as f32, self.size.height as f32];
@@ -271,11 +312,13 @@ impl Renderer {
         // Update appropriate pipeline uniforms based on render mode
         match state.render_mode {
             RenderMode::Procedural2D => {
-                self.procedural_pipeline.update_uniforms(&self.queue, state, time, resolution);
+                self.procedural_pipeline
+                    .update_uniforms(&self.queue, state, time, resolution);
             }
             RenderMode::Sdf3D => {
                 let scene_id = ui.sdf_scene_id();
-                self.sdf_pipeline.update_uniforms(&self.queue, state, time, resolution, scene_id);
+                self.sdf_pipeline
+                    .update_uniforms(&self.queue, state, time, resolution, scene_id);
             }
         }
 
@@ -298,7 +341,8 @@ impl Renderer {
             // Render with appropriate pipeline
             match state.render_mode {
                 RenderMode::Procedural2D => {
-                    self.procedural_pipeline.render(&mut render_pass, state, decoder);
+                    self.procedural_pipeline
+                        .render(&mut render_pass, state, decoder);
                 }
                 RenderMode::Sdf3D => {
                     self.sdf_pipeline.render(&mut render_pass);
@@ -313,13 +357,13 @@ impl Renderer {
 
         let full_output = ui.render(&self.egui_ctx, state);
 
-        let clipped_primitives = self.egui_ctx.tessellate(
-            full_output.shapes,
-            full_output.pixels_per_point,
-        );
+        let clipped_primitives = self
+            .egui_ctx
+            .tessellate(full_output.shapes, full_output.pixels_per_point);
 
         for (id, image_delta) in &full_output.textures_delta.set {
-            self.egui_renderer.update_texture(&self.device, &self.queue, *id, image_delta);
+            self.egui_renderer
+                .update_texture(&self.device, &self.queue, *id, image_delta);
         }
 
         self.egui_renderer.update_buffers(
@@ -346,7 +390,8 @@ impl Renderer {
                 occlusion_query_set: None,
             });
 
-            self.egui_renderer.render(&mut render_pass, &clipped_primitives, &screen_descriptor);
+            self.egui_renderer
+                .render(&mut render_pass, &clipped_primitives, &screen_descriptor);
         }
 
         for id in &full_output.textures_delta.free {

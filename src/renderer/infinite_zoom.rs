@@ -32,6 +32,7 @@ pub enum Precision {
 
 impl LodLevel {
     /// Calculate LOD level from zoom factor
+    #[must_use]
     pub fn from_zoom(zoom: f32) -> Self {
         let iterations = calculate_iterations(zoom);
         let precision = calculate_precision(zoom);
@@ -44,6 +45,7 @@ impl LodLevel {
     }
 
     /// Get recommended texture resolution for current LOD
+    #[must_use]
     pub fn recommended_resolution(&self, base_resolution: u32) -> u32 {
         // Scale resolution with zoom, capped at reasonable limits
         let scaled = (base_resolution as f32 * self.zoom.sqrt()) as u32;
@@ -79,6 +81,7 @@ pub struct InfiniteZoomManager {
 }
 
 impl InfiniteZoomManager {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             current_lod: LodLevel::from_zoom(1.0),
@@ -103,16 +106,18 @@ impl InfiniteZoomManager {
     }
 
     /// Get current LOD level
+    #[must_use]
     pub fn current(&self) -> &LodLevel {
         &self.current_lod
     }
 
     /// Get shader parameters for current LOD
+    #[must_use]
     pub fn shader_params(&self) -> LodShaderParams {
         LodShaderParams {
             iterations: self.current_lod.iterations,
             zoom: self.current_lod.zoom,
-            use_double_precision: if self.current_lod.precision != Precision::Standard { 1 } else { 0 },
+            use_double_precision: u32::from(self.current_lod.precision != Precision::Standard),
             _padding: 0,
         }
     }

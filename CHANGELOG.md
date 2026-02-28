@@ -2,6 +2,17 @@
 
 All notable changes to ALICE-View are documented here.
 
+## [0.2.1] — 2026-02-28
+
+### Changed
+- Clippy pedantic 0 warnings across all targets (lib + binaries)
+- Added `#![allow]` blocks to binary crate roots for package-wide consistency
+- Changed `&self` to `self` on small Copy types (`AliceContentType::name`, `ExportFormat::extension/filter_name`, `SdfScene::name`)
+- Fixed `alice-create` format strings, clone efficiency, long literal separators, doc backticks
+- Fixed wildcard import in `alice-create` to explicit imports
+- Added `#[allow]` annotations on stub methods (`asp::process_packet`, `ui::handle_event`)
+- Fixed `physics_bridge.rs` test imports
+
 ## [0.2.0] — 2026-02-23
 
 ### Added

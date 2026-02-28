@@ -1,12 +1,25 @@
-//! ALICE File Creator - CLI tool to create .alice files
+//! ALICE File Creator - CLI tool to create `.alice` files
 //!
 //! Usage:
-//!   alice-create linear --slope 0.005 --intercept 25.0 --samples 1000 -o sensor_data.alice
-//!   alice-create mandelbrot --iterations 256 -o fractal.alice
-//!   alice-create julia --cx -0.7 --cy 0.27 -o julia.alice
-//!   alice-create perlin --seed 12345 --scale 5.0 -o terrain.alice
+//!   `alice-create linear --slope 0.005 --intercept 25.0 --samples 1000 -o sensor_data.alice`
+//!   `alice-create mandelbrot --iterations 256 -o fractal.alice`
+//!   `alice-create julia --cx -0.7 --cy 0.27 -o julia.alice`
+//!   `alice-create perlin --seed 12345 --scale 5.0 -o terrain.alice`
 
-use alice_view::decoder::alice::*;
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::module_name_repetitions,
+    clippy::inline_always,
+    clippy::too_many_lines
+)]
+
+use alice_view::decoder::alice::{AliceFile, AliceFileBuilder};
 use std::fs;
 
 fn print_usage() {
@@ -56,7 +69,7 @@ fn main() {
         match args[i].as_str() {
             "-o" | "--output" => {
                 if i + 1 < args.len() {
-                    output_path = args[i + 1].clone();
+                    output_path.clone_from(&args[i + 1]);
                     i += 2;
                 } else {
                     i += 1;
@@ -96,7 +109,7 @@ fn main() {
             return;
         }
         _ => {
-            eprintln!("Unknown command: {}", command);
+            eprintln!("Unknown command: {command}");
             print_usage();
             return;
         }
@@ -108,25 +121,25 @@ fn main() {
             let mut final_output = output_path;
             for i in 0..args.len() - 1 {
                 if args[i] == "-o" || args[i] == "--output" {
-                    final_output = args[i + 1].clone();
+                    final_output.clone_from(&args[i + 1]);
                     break;
                 }
             }
 
             let bytes = file.to_bytes();
             if let Err(e) = fs::write(&final_output, &bytes) {
-                eprintln!("Failed to write file: {}", e);
+                eprintln!("Failed to write file: {e}");
                 return;
             }
 
-            println!("✅ Created: {}", final_output);
+            println!("✅ Created: {final_output}");
             println!("   Type: {}", file.content_type_name());
             println!("   Equation: {}", file.equation_string());
             println!("   Size: {} bytes", bytes.len());
             println!("   Compression: {:.0}x", file.compression_ratio());
         }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("Error: {e}");
         }
     }
 }
@@ -180,7 +193,7 @@ fn create_linear_q16(
     unit: Option<String>,
 ) -> anyhow::Result<AliceFile> {
     let mut slope_q16: i32 = 32767;
-    let mut intercept_q16: i32 = 163840000;
+    let mut intercept_q16: i32 = 163_840_000;
     let mut samples: u32 = 1000;
 
     let mut i = 0;
@@ -301,7 +314,7 @@ fn create_demo(sensor_id: Option<String>, unit: Option<String>) -> anyhow::Resul
     // samples = 1000
 
     let slope_q16 = 32767; // ~0.5 in Q16.16
-    let intercept_q16 = 163824115; // ~2499.76 in Q16.16
+    let intercept_q16 = 163_824_115; // ~2499.76 in Q16.16
 
     let mut builder = AliceFileBuilder::from_linear(slope_q16, intercept_q16, 1000);
 

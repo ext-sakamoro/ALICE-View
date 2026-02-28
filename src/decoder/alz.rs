@@ -26,6 +26,7 @@ impl AlzHeader {
     pub const MAGIC: [u8; 5] = *b"ALICE";
 
     /// Validate header
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.magic == Self::MAGIC
     }
@@ -62,5 +63,60 @@ impl TryFrom<u8> for AlzContentType {
             5 => Ok(Self::Fractal),
             _ => Err(()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alz_header_valid_magic() {
+        let header = AlzHeader {
+            magic: *b"ALICE",
+            version: 1,
+            content_type: 0,
+            flags: 0,
+            original_size: 1000,
+            compressed_size: 100,
+        };
+        assert!(header.is_valid());
+    }
+
+    #[test]
+    fn alz_header_invalid_magic() {
+        let header = AlzHeader {
+            magic: *b"WRONG",
+            version: 1,
+            content_type: 0,
+            flags: 0,
+            original_size: 1000,
+            compressed_size: 100,
+        };
+        assert!(!header.is_valid());
+    }
+
+    #[test]
+    fn alz_content_type_all_valid() {
+        assert_eq!(AlzContentType::try_from(0u8), Ok(AlzContentType::RawLzma));
+        assert_eq!(AlzContentType::try_from(1u8), Ok(AlzContentType::Perlin));
+        assert_eq!(
+            AlzContentType::try_from(2u8),
+            Ok(AlzContentType::Polynomial)
+        );
+        assert_eq!(AlzContentType::try_from(3u8), Ok(AlzContentType::Sine));
+        assert_eq!(AlzContentType::try_from(4u8), Ok(AlzContentType::Fourier));
+        assert_eq!(AlzContentType::try_from(5u8), Ok(AlzContentType::Fractal));
+    }
+
+    #[test]
+    fn alz_content_type_invalid() {
+        assert!(AlzContentType::try_from(6u8).is_err());
+        assert!(AlzContentType::try_from(255u8).is_err());
+    }
+
+    #[test]
+    fn alz_magic_constant() {
+        assert_eq!(&AlzHeader::MAGIC, b"ALICE");
     }
 }
