@@ -79,6 +79,24 @@ The binary is at `target/release/alice-view`.
 cargo install --path .
 ```
 
+### Pre-built Binaries
+
+Download from [Releases](https://github.com/ext-sakamoro/ALICE-View/releases):
+
+| Platform | File |
+|----------|------|
+| **Windows x86_64** | `alice-view-windows-x86_64-vX.Y.Z.zip` |
+| **Linux x86_64** | `alice-view-linux-x86_64-vX.Y.Z.tar.gz` |
+| **macOS aarch64** | `alice-view-macos-aarch64-vX.Y.Z.tar.gz` |
+
+**macOS**: Binaries are not code-signed. Remove the quarantine attribute after extracting:
+
+```bash
+tar xzf alice-view-macos-aarch64-vX.Y.Z.tar.gz
+xattr -cr alice-view alice-create
+./alice-view
+```
+
 ## Usage
 
 ### Open an SDF file
