@@ -269,7 +269,15 @@ Heavy SDF scenes (deep CSG trees, complex smooth operations) can be GPU-intensiv
 | **Over-Relaxation** | Step size increases with distance (`d * (1 + t * 0.05)`), reducing total steps for background rays |
 | **Adaptive AO** | AO samples reduced from 5 to 2 for surfaces beyond `t > 20.0` |
 
-Toggle via the **Adaptive Quality** checkbox in the SDF panel (on by default).
+### How to Use
+
+Open the **Raymarching** section in the left SDF panel:
+
+1. **Quality Preset** — Select Fast / Balanced / Quality / Ultra from the dropdown. Each preset automatically sets Max Steps, Epsilon, and AO.
+2. **Adaptive Quality** — Toggle the checkbox (on by default). When enabled, distant pixels use fewer raymarching steps for better FPS.
+3. **Manual Tuning** — Use the Max Steps slider and Epsilon slider below to fine-tune after selecting a preset.
+
+**Tip**: If a complex SDF scene (e.g. `Teleporter01_Art.asdf.json`) is slow, switch to **Fast** preset first, then increase quality as needed.
 
 ### Quality Presets
 
