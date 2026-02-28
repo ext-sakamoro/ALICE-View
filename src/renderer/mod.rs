@@ -23,7 +23,7 @@ use wgpu::{
     TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor,
     COPY_BYTES_PER_ROW_ALIGNMENT,
 };
-use winit::{dpi::PhysicalSize, window::Window};
+use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
 /// Main renderer
 #[allow(clippy::struct_field_names)]
@@ -38,12 +38,10 @@ pub struct Renderer {
     // 3D SDF raymarching pipeline
     sdf_pipeline: SdfPipeline,
     egui_renderer: egui_wgpu::Renderer,
-    // egui_winit::State must be kept alive for correct input handling even
-    // though we process events at the App level.
-    #[allow(dead_code)]
     egui_state: egui_winit::State,
     egui_ctx: egui::Context,
     start_time: std::time::Instant,
+    window: Arc<Window>,
 }
 
 impl Renderer {
@@ -132,6 +130,7 @@ impl Renderer {
             egui_state,
             egui_ctx,
             start_time: std::time::Instant::now(),
+            window,
         })
     }
 
@@ -146,6 +145,11 @@ impl Renderer {
 
     pub fn egui_ctx(&self) -> &egui::Context {
         &self.egui_ctx
+    }
+
+    /// Forward a winit window event to egui for input processing
+    pub fn on_window_event(&mut self, event: &WindowEvent) -> egui_winit::EventResponse {
+        self.egui_state.on_window_event(&self.window, event)
     }
 
     /// Rebuild SDF pipeline with dynamic WGSL shader from .asdf file
@@ -355,13 +359,22 @@ impl Renderer {
             pixels_per_point: 1.0,
         };
 
-        let full_output = ui.render(&self.egui_ctx, state);
+        // Collect accumulated input events and feed them to egui
+        let raw_input = self.egui_state.take_egui_input(&self.window);
+        let full_output = ui.render(&self.egui_ctx, state, raw_input);
 
-        let clipped_primitives = self
-            .egui_ctx
-            .tessellate(full_output.shapes, full_output.pixels_per_point);
+        // Destructure to avoid partial-move issues
+        let egui::FullOutput {
+            platform_output,
+            textures_delta,
+            shapes,
+            pixels_per_point,
+            ..
+        } = full_output;
 
-        for (id, image_delta) in &full_output.textures_delta.set {
+        let clipped_primitives = self.egui_ctx.tessellate(shapes, pixels_per_point);
+
+        for (id, image_delta) in &textures_delta.set {
             self.egui_renderer
                 .update_texture(&self.device, &self.queue, *id, image_delta);
         }
@@ -394,9 +407,13 @@ impl Renderer {
                 .render(&mut render_pass, &clipped_primitives, &screen_descriptor);
         }
 
-        for id in &full_output.textures_delta.free {
+        for id in &textures_delta.free {
             self.egui_renderer.free_texture(id);
         }
+
+        // Handle cursor changes, clipboard, etc.
+        self.egui_state
+            .handle_platform_output(&self.window, platform_output);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

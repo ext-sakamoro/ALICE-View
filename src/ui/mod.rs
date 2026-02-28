@@ -26,7 +26,6 @@ use crate::decoder::Decoder;
 use egui::FullOutput;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use winit::event::WindowEvent;
 
 /// UI state and rendering
 pub struct Ui {
@@ -85,19 +84,6 @@ impl Ui {
     #[must_use]
     pub fn file_info(&self) -> Option<&FileInfo> {
         self.current_file_info.as_ref()
-    }
-
-    /// Handle window events
-    #[allow(clippy::unused_self)]
-    pub fn handle_event(
-        &mut self,
-        _event: &WindowEvent,
-        _ctx: &egui::Context,
-    ) -> egui_winit::EventResponse {
-        egui_winit::EventResponse {
-            consumed: false,
-            repaint: false,
-        }
     }
 
     /// Start mesh export
@@ -222,9 +208,14 @@ impl Ui {
     }
 
     /// Render UI
-    pub fn render(&mut self, ctx: &egui::Context, state: &mut ViewerState) -> FullOutput {
-        // Begin egui frame
-        ctx.begin_frame(egui::RawInput::default());
+    pub fn render(
+        &mut self,
+        ctx: &egui::Context,
+        state: &mut ViewerState,
+        raw_input: egui::RawInput,
+    ) -> FullOutput {
+        // Begin egui frame with accumulated input events
+        ctx.begin_frame(raw_input);
 
         // 1. Top Menu Bar
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {

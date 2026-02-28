@@ -616,13 +616,27 @@ impl App {
         }
     }
 
+    /// Check if egui wants pointer input (mouse is over a UI element)
+    fn egui_wants_pointer(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .is_some_and(|r| r.egui_ctx().wants_pointer_input())
+    }
+
+    /// Check if egui wants keyboard input (e.g. text field focused)
+    fn egui_wants_keyboard(&self) -> bool {
+        self.renderer
+            .as_ref()
+            .is_some_and(|r| r.egui_ctx().wants_keyboard_input())
+    }
+
     /// Main event handling logic (winit 0.29 style)
     ///
     /// # Panics
     ///
     /// Panics if the renderer has not been initialised before a render request arrives.
     pub fn handle_event(&mut self, event: Event<()>, target: &EventLoopWindowTarget<()>) {
-        // Handle UI events first
+        // Forward window events to egui for input processing
         if let (
             Some(renderer),
             Event::WindowEvent {
@@ -630,8 +644,13 @@ impl App {
             },
         ) = (&mut self.renderer, &event)
         {
-            let response = self.ui.handle_event(w_event, renderer.egui_ctx());
+            let response = renderer.on_window_event(w_event);
             if response.consumed {
+                if response.repaint {
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
+                }
                 return;
             }
         }
@@ -651,51 +670,61 @@ impl App {
                     event:
                         KeyEvent {
                             physical_key: PhysicalKey::Code(key),
-                            state,
+                            state: key_state,
                             ..
                         },
                     ..
                 } => {
-                    self.handle_key(key, state == ElementState::Pressed);
-                    // Request redraw to reflect state changes
+                    // Only process camera/app keys if egui doesn't want keyboard
+                    if !self.egui_wants_keyboard() {
+                        self.handle_key(key, key_state == ElementState::Pressed);
+                    }
                     if let Some(window) = &self.window {
                         window.request_redraw();
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
-                    let scroll = match delta {
-                        winit::event::MouseScrollDelta::LineDelta(_, y) => y,
-                        winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 / 100.0,
-                    };
-                    self.handle_scroll(scroll);
+                    // Only process scroll for camera if egui doesn't want pointer
+                    if !self.egui_wants_pointer() {
+                        let scroll = match delta {
+                            winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                            winit::event::MouseScrollDelta::PixelDelta(pos) => {
+                                pos.y as f32 / 100.0
+                            }
+                        };
+                        self.handle_scroll(scroll);
+                    }
                     if let Some(window) = &self.window {
                         window.request_redraw();
                     }
                 }
                 // Mouse button press/release
                 WindowEvent::MouseInput {
-                    state,
+                    state: btn_state,
                     button: winit::event::MouseButton::Left,
                     ..
                 } => {
-                    self.mouse_pressed = state == ElementState::Pressed;
+                    if self.egui_wants_pointer() {
+                        // egui is handling this click; release camera drag
+                        self.mouse_pressed = false;
+                    } else {
+                        self.mouse_pressed = btn_state == ElementState::Pressed;
+                    }
                 }
                 // Mouse movement (drag to pan/orbit)
                 WindowEvent::CursorMoved { position, .. } => {
-                    if self.mouse_pressed {
+                    if self.mouse_pressed && !self.egui_wants_pointer() {
                         if let Some(last_pos) = self.last_mouse_pos {
                             let dx = (position.x - last_pos.x) as f32;
                             let dy = (position.y - last_pos.y) as f32;
 
                             match self.state.render_mode {
                                 RenderMode::Procedural2D => {
-                                    // 2D: Scale movement by zoom level
                                     let sensitivity = 0.002 / self.state.zoom;
                                     self.state.pan[0] -= dx * sensitivity;
                                     self.state.pan[1] += dy * sensitivity;
                                 }
                                 RenderMode::Sdf3D => {
-                                    // 3D: Orbit camera around target
                                     let orbit_sensitivity = 0.01;
                                     self.state
                                         .camera
