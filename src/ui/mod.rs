@@ -74,7 +74,7 @@ impl Ui {
 
     /// Get current SDF scene ID for shader
     #[must_use]
-    pub fn sdf_scene_id(&self) -> u32 {
+    pub const fn sdf_scene_id(&self) -> u32 {
         self.sdf_panel.scene_id()
     }
 
@@ -82,7 +82,7 @@ impl Ui {
     // Available for external embedders that render file info in their own UI.
     #[allow(dead_code)]
     #[must_use]
-    pub fn file_info(&self) -> Option<&FileInfo> {
+    pub const fn file_info(&self) -> Option<&FileInfo> {
         self.current_file_info.as_ref()
     }
 
@@ -176,12 +176,12 @@ impl Ui {
     ///
     /// Returns the WGSL shader source if a new .asdf was loaded,
     /// clearing the pending state.
-    pub fn take_pending_wgsl(&mut self) -> Option<String> {
+    pub const fn take_pending_wgsl(&mut self) -> Option<String> {
         self.pending_wgsl.take()
     }
 
     /// Toggle file info panel
-    pub fn toggle_file_info(&mut self) {
+    pub const fn toggle_file_info(&mut self) {
         self.file_info_open = !self.file_info_open;
     }
 

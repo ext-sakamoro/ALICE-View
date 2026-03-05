@@ -17,18 +17,18 @@ pub enum ExportFormat {
 
 impl ExportFormat {
     #[must_use]
-    pub fn extension(self) -> &'static str {
+    pub const fn extension(self) -> &'static str {
         match self {
-            ExportFormat::Glb => "glb",
-            ExportFormat::Obj => "obj",
+            Self::Glb => "glb",
+            Self::Obj => "obj",
         }
     }
 
     #[must_use]
-    pub fn filter_name(self) -> &'static str {
+    pub const fn filter_name(self) -> &'static str {
         match self {
-            ExportFormat::Glb => "glTF Binary",
-            ExportFormat::Obj => "Wavefront OBJ",
+            Self::Glb => "glTF Binary",
+            Self::Obj => "Wavefront OBJ",
         }
     }
 }
@@ -87,37 +87,6 @@ pub fn export_mesh(
     });
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn export_format_glb_extension() {
-        assert_eq!(ExportFormat::Glb.extension(), "glb");
-    }
-
-    #[test]
-    fn export_format_obj_extension() {
-        assert_eq!(ExportFormat::Obj.extension(), "obj");
-    }
-
-    #[test]
-    fn export_format_glb_filter_name() {
-        assert_eq!(ExportFormat::Glb.filter_name(), "glTF Binary");
-    }
-
-    #[test]
-    fn export_format_obj_filter_name() {
-        assert_eq!(ExportFormat::Obj.filter_name(), "Wavefront OBJ");
-    }
-
-    #[test]
-    fn export_format_equality() {
-        assert_eq!(ExportFormat::Glb, ExportFormat::Glb);
-        assert_ne!(ExportFormat::Glb, ExportFormat::Obj);
-    }
-}
-
 fn generate_and_save(
     tree: &alice_sdf::types::SdfTree,
     bounds: (glam::Vec3, glam::Vec3),
@@ -150,4 +119,35 @@ fn generate_and_save(
     }
 
     Ok(format!("{vertex_count} vertices, {tri_count} triangles"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_format_glb_extension() {
+        assert_eq!(ExportFormat::Glb.extension(), "glb");
+    }
+
+    #[test]
+    fn export_format_obj_extension() {
+        assert_eq!(ExportFormat::Obj.extension(), "obj");
+    }
+
+    #[test]
+    fn export_format_glb_filter_name() {
+        assert_eq!(ExportFormat::Glb.filter_name(), "glTF Binary");
+    }
+
+    #[test]
+    fn export_format_obj_filter_name() {
+        assert_eq!(ExportFormat::Obj.filter_name(), "Wavefront OBJ");
+    }
+
+    #[test]
+    fn export_format_equality() {
+        assert_eq!(ExportFormat::Glb, ExportFormat::Glb);
+        assert_ne!(ExportFormat::Glb, ExportFormat::Obj);
+    }
 }

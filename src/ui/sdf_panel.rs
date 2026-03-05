@@ -33,7 +33,7 @@ pub enum SdfScene {
 
 impl SdfScene {
     #[must_use]
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::CarvedSphere => "Carved Sphere",
             Self::Sphere => "Simple Sphere",
@@ -46,14 +46,14 @@ impl SdfScene {
     }
 
     #[must_use]
-    pub fn all_demo() -> &'static [SdfScene] {
+    pub const fn all_demo() -> &'static [Self] {
         &[
-            SdfScene::CarvedSphere,
-            SdfScene::Sphere,
-            SdfScene::RoundedBox,
-            SdfScene::TorusKnot,
-            SdfScene::InfinitePillars,
-            SdfScene::TwistedBox,
+            Self::CarvedSphere,
+            Self::Sphere,
+            Self::RoundedBox,
+            Self::TorusKnot,
+            Self::InfinitePillars,
+            Self::TwistedBox,
         ]
     }
 }
@@ -127,11 +127,10 @@ impl SdfPanel {
                         .strong()
                         .color(egui::Color32::from_rgb(100, 255, 100)),
                 );
-                let label = if let Some(ref info) = self.loaded_asdf_info {
-                    format!("  {info}")
-                } else {
-                    "  Loaded .asdf".to_string()
-                };
+                let label = self
+                    .loaded_asdf_info
+                    .as_ref()
+                    .map_or_else(|| "  Loaded .asdf".to_string(), |info| format!("  {info}"));
                 if ui
                     .selectable_label(self.scene == SdfScene::LoadedAsdf, label)
                     .clicked()
@@ -384,7 +383,7 @@ impl SdfPanel {
 
     /// Get current scene ID for shader
     #[must_use]
-    pub fn scene_id(&self) -> u32 {
+    pub const fn scene_id(&self) -> u32 {
         self.scene as u32
     }
 }

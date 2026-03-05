@@ -91,7 +91,7 @@ pub struct KeyframeData {
 
 impl AspStreamState {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             keyframe: None,
             sequence: 0,
@@ -104,7 +104,11 @@ impl AspStreamState {
     /// # Errors
     ///
     /// Returns an error string if packet processing fails (currently a stub).
-    #[allow(clippy::unused_self, clippy::unnecessary_wraps)]
+    #[allow(
+        clippy::unused_self,
+        clippy::unnecessary_wraps,
+        clippy::needless_pass_by_ref_mut
+    )]
     pub fn process_packet(&mut self, _data: &[u8]) -> Result<(), &'static str> {
         log::warn!("process_packet() is a stub — ASP packet processing not yet implemented");
         // TODO: Implement actual packet processing

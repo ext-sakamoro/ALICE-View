@@ -16,7 +16,7 @@ pub struct ViewportState {
 
 impl ViewportState {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             drag_start: None,
             initial_pan: [0.0, 0.0],
@@ -24,13 +24,14 @@ impl ViewportState {
     }
 
     /// Handle drag start
-    pub fn start_drag(&mut self, pos: [f32; 2], current_pan: [f32; 2]) {
+    pub const fn start_drag(&mut self, pos: [f32; 2], current_pan: [f32; 2]) {
         self.drag_start = Some(pos);
         self.initial_pan = current_pan;
     }
 
     /// Handle drag update
-    pub fn update_drag(&mut self, pos: [f32; 2], zoom: f32) -> Option<[f32; 2]> {
+    #[must_use]
+    pub fn update_drag(&self, pos: [f32; 2], zoom: f32) -> Option<[f32; 2]> {
         self.drag_start.map(|start| {
             let zoom_rcp = 1.0 / zoom;
             let delta_x = (pos[0] - start[0]) * zoom_rcp;
@@ -40,13 +41,13 @@ impl ViewportState {
     }
 
     /// End drag
-    pub fn end_drag(&mut self) {
+    pub const fn end_drag(&mut self) {
         self.drag_start = None;
     }
 
     /// Check if dragging
     #[must_use]
-    pub fn is_dragging(&self) -> bool {
+    pub const fn is_dragging(&self) -> bool {
         self.drag_start.is_some()
     }
 }
@@ -122,8 +123,53 @@ mod tests {
 
     #[test]
     fn viewport_no_drag_returns_none() {
-        let mut vs = ViewportState::new();
+        let vs = ViewportState::new();
         let pan = vs.update_drag([10.0, 5.0], 1.0);
         assert!(pan.is_none());
+    }
+
+    #[test]
+    fn viewport_default_not_dragging() {
+        let vs = ViewportState::default();
+        assert!(!vs.is_dragging());
+    }
+
+    #[test]
+    fn viewport_drag_with_initial_pan_offset() {
+        let mut vs = ViewportState::new();
+        // Start at (50, 50) with existing pan (2.0, 3.0)
+        vs.start_drag([50.0, 50.0], [2.0, 3.0]);
+        // Move to (60, 55) at zoom=1 → delta=(10,5), result=initial+delta
+        let pan = vs.update_drag([60.0, 55.0], 1.0).unwrap();
+        assert!((pan[0] - 12.0).abs() < 1e-5, "pan[0]={}", pan[0]);
+        assert!((pan[1] - 8.0).abs() < 1e-5, "pan[1]={}", pan[1]);
+    }
+
+    #[test]
+    fn viewport_zoom_half_doubles_movement() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([0.0, 0.0], [0.0, 0.0]);
+        // zoom=0.5 → 1/zoom=2 → pixel movement is doubled
+        let pan = vs.update_drag([10.0, 0.0], 0.5).unwrap();
+        assert!((pan[0] - 20.0).abs() < 1e-5, "pan[0]={}", pan[0]);
+    }
+
+    #[test]
+    fn viewport_update_drag_y_only() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([0.0, 0.0], [0.0, 0.0]);
+        let pan = vs.update_drag([0.0, 8.0], 1.0).unwrap();
+        assert!(pan[0].abs() < 1e-5);
+        assert!((pan[1] - 8.0).abs() < 1e-5, "pan[1]={}", pan[1]);
+    }
+
+    #[test]
+    fn viewport_restart_drag_uses_new_initial_pan() {
+        let mut vs = ViewportState::new();
+        vs.start_drag([0.0, 0.0], [5.0, 5.0]);
+        vs.end_drag();
+        vs.start_drag([0.0, 0.0], [0.0, 0.0]);
+        let pan = vs.update_drag([3.0, 0.0], 1.0).unwrap();
+        assert!((pan[0] - 3.0).abs() < 1e-5, "pan[0]={}", pan[0]);
     }
 }

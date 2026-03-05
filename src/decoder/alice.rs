@@ -69,7 +69,7 @@ impl TryFrom<u8> for AliceContentType {
 
 impl AliceContentType {
     #[must_use]
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Linear => "Linear",
             Self::Polynomial => "Polynomial",
@@ -157,7 +157,7 @@ impl AliceHeader {
 
     /// Check if file has metadata
     #[must_use]
-    pub fn has_metadata(&self) -> bool {
+    pub const fn has_metadata(&self) -> bool {
         self.metadata_length > 0
     }
 
@@ -356,7 +356,7 @@ impl FractalPayload {
     }
 
     #[must_use]
-    pub fn fractal_name(&self) -> &'static str {
+    pub const fn fractal_name(&self) -> &'static str {
         match self.fractal_type {
             0 => "Mandelbrot",
             1 => "Julia",
@@ -595,7 +595,7 @@ impl AliceFile {
 
     /// Get content type name
     #[must_use]
-    pub fn content_type_name(&self) -> &'static str {
+    pub const fn content_type_name(&self) -> &'static str {
         self.header.content_type.name()
     }
 
@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn test_linear_roundtrip() {
-        let file = AliceFileBuilder::from_linear(32767, 163824115, 1000)
+        let file = AliceFileBuilder::from_linear(32767, 163_824_115, 1000)
             .sensor_id("TEMP-001")
             .unit("°C")
             .build()
@@ -774,7 +774,7 @@ mod tests {
         assert_eq!(parsed.header.content_type, AliceContentType::Linear);
         if let AlicePayload::Linear(p) = &parsed.payload {
             assert_eq!(p.slope_q16, 32767);
-            assert_eq!(p.intercept_q16, 163824115);
+            assert_eq!(p.intercept_q16, 163_824_115);
         } else {
             panic!("Wrong payload type");
         }
@@ -783,12 +783,342 @@ mod tests {
     #[test]
     fn test_equation_string() {
         let payload = LinearPayload {
-            slope_q16: 32767,         // ~0.5
-            intercept_q16: 163840000, // ~2500
+            slope_q16: 32767,           // ~0.5
+            intercept_q16: 163_840_000, // ~2500
             sample_count: 1000,
         };
         let eq = payload.equation_string();
         assert!(eq.contains("y ="));
-        assert!(eq.contains("x"));
+        assert!(eq.contains('x'));
+    }
+
+    // ── AliceContentType ────────────────────────────────────────────
+
+    #[test]
+    fn content_type_try_from_all_valid() {
+        for i in 0u8..=6 {
+            assert!(
+                AliceContentType::try_from(i).is_ok(),
+                "byte {i} should parse"
+            );
+        }
+    }
+
+    #[test]
+    fn content_type_try_from_invalid() {
+        assert!(AliceContentType::try_from(7).is_err());
+        assert!(AliceContentType::try_from(255).is_err());
+    }
+
+    #[test]
+    fn content_type_names_non_empty() {
+        for i in 0u8..=6 {
+            let ct = AliceContentType::try_from(i).unwrap();
+            assert!(!ct.name().is_empty(), "content type {i} should have a name");
+        }
+    }
+
+    // ── AliceHeader ─────────────────────────────────────────────────
+
+    #[test]
+    fn header_parse_too_short() {
+        let short = [0u8; 16];
+        assert!(AliceHeader::parse(&short).is_err());
+    }
+
+    #[test]
+    fn header_parse_bad_magic() {
+        let mut data = [0u8; AliceHeader::SIZE];
+        data[0..5].copy_from_slice(b"HELLO");
+        assert!(AliceHeader::parse(&data).is_err());
+    }
+
+    #[test]
+    fn header_roundtrip() {
+        let mut data = [0u8; AliceHeader::SIZE];
+        data[0..5].copy_from_slice(b"ALICE");
+        data[5] = 1; // version
+        data[6] = 0; // Linear
+        data[7] = 0; // flags
+        data[8..16].copy_from_slice(&100u64.to_le_bytes());
+        data[16..24].copy_from_slice(&50u64.to_le_bytes());
+        data[24..28].copy_from_slice(&0u32.to_le_bytes());
+
+        let header = AliceHeader::parse(&data).unwrap();
+        assert_eq!(header.version, 1);
+        assert_eq!(header.content_type, AliceContentType::Linear);
+        assert_eq!(header.original_size, 100);
+        assert_eq!(header.compressed_size, 50);
+        assert!(!header.has_metadata());
+
+        let bytes = header.to_bytes();
+        let reparsed = AliceHeader::parse(&bytes).unwrap();
+        assert_eq!(reparsed.original_size, 100);
+        assert_eq!(reparsed.compressed_size, 50);
+    }
+
+    #[test]
+    fn header_compression_ratio_nonzero() {
+        let file = AliceFileBuilder::from_linear(65536, 0, 500)
+            .build()
+            .unwrap();
+        let ratio = file.header.compression_ratio();
+        assert!(ratio > 0.0, "ratio should be positive");
+    }
+
+    #[test]
+    fn header_has_metadata_true_when_sensor_set() {
+        let file = AliceFileBuilder::from_linear(0, 0, 10)
+            .sensor_id("S1")
+            .build()
+            .unwrap();
+        assert!(file.header.has_metadata());
+    }
+
+    // ── LinearPayload Q16 arithmetic ────────────────────────────────
+
+    #[test]
+    fn linear_payload_slope_zero_equation() {
+        // slope_q16 = 0 means slope == 0 → equation should not contain 'x'
+        let p = LinearPayload {
+            slope_q16: 0,
+            intercept_q16: 65536, // 1.0 in Q16
+            sample_count: 0,
+        };
+        let eq = p.equation_string();
+        assert!(eq.starts_with("y ="), "got: {eq}");
+        assert!(!eq.contains('x'), "zero slope should omit x: {eq}");
+    }
+
+    #[test]
+    fn linear_payload_negative_intercept_equation() {
+        let p = LinearPayload {
+            slope_q16: 65536,      // slope = 1.0
+            intercept_q16: -65536, // intercept = -1.0
+            sample_count: 0,
+        };
+        let eq = p.equation_string();
+        assert!(eq.contains(" - "), "expected minus sign format: {eq}");
+    }
+
+    #[test]
+    fn linear_payload_evaluate_at_zero() {
+        // intercept_q16 = 0, slope = anything → evaluate(0) = 0
+        let p = LinearPayload {
+            slope_q16: 65536,
+            intercept_q16: 0,
+            sample_count: 0,
+        };
+        let y = p.evaluate(0);
+        assert!(y.abs() < 1e-5, "evaluate(0) should be 0, got {y}");
+    }
+
+    #[test]
+    fn linear_payload_to_bytes_length() {
+        let p = LinearPayload {
+            slope_q16: 1,
+            intercept_q16: 2,
+            sample_count: 3,
+        };
+        assert_eq!(p.to_bytes().len(), LinearPayload::SIZE);
+    }
+
+    // ── PerlinPayload ────────────────────────────────────────────────
+
+    #[test]
+    fn perlin_payload_roundtrip() {
+        let original = PerlinPayload {
+            seed: 0xDEAD_BEEF_1234_5678,
+            scale: std::f32::consts::PI,
+            octaves: 8,
+            persistence: 0.6,
+            lacunarity: 2.5,
+        };
+        let bytes = original.to_bytes();
+        assert_eq!(bytes.len(), PerlinPayload::SIZE);
+        let parsed = PerlinPayload::parse(&bytes).unwrap();
+        assert_eq!(parsed.seed, original.seed);
+        assert_eq!(parsed.octaves, original.octaves);
+        assert!((parsed.scale - original.scale).abs() < 1e-5);
+    }
+
+    #[test]
+    fn perlin_payload_equation_string_contains_seed() {
+        let p = PerlinPayload {
+            seed: 42,
+            scale: 1.5,
+            octaves: 4,
+            persistence: 0.5,
+            lacunarity: 2.0,
+        };
+        let s = p.equation_string();
+        assert!(s.contains("42"), "should contain seed: {s}");
+        assert!(s.contains('4'), "should contain octaves: {s}");
+    }
+
+    // ── FractalPayload ───────────────────────────────────────────────
+
+    #[test]
+    fn fractal_payload_mandelbrot_name() {
+        let p = FractalPayload {
+            fractal_type: 0,
+            max_iterations: 256,
+            escape_radius: 2.0,
+            center_x: 0.0,
+            center_y: 0.0,
+            julia_cx: 0.0,
+            julia_cy: 0.0,
+        };
+        assert_eq!(p.fractal_name(), "Mandelbrot");
+    }
+
+    #[test]
+    fn fractal_payload_all_type_names() {
+        let expected = ["Mandelbrot", "Julia", "Burning Ship", "Tricorn", "Unknown"];
+        for (i, name) in expected.iter().enumerate() {
+            let p = FractalPayload {
+                fractal_type: i as u8,
+                max_iterations: 64,
+                escape_radius: 2.0,
+                center_x: 0.0,
+                center_y: 0.0,
+                julia_cx: 0.0,
+                julia_cy: 0.0,
+            };
+            assert_eq!(p.fractal_name(), *name, "type {i}");
+        }
+    }
+
+    #[test]
+    fn fractal_payload_julia_equation_contains_cx() {
+        let p = FractalPayload {
+            fractal_type: 1,
+            max_iterations: 128,
+            escape_radius: 2.0,
+            center_x: 0.0,
+            center_y: 0.0,
+            julia_cx: -0.7,
+            julia_cy: 0.27,
+        };
+        let eq = p.equation_string();
+        assert!(eq.contains("Julia"), "expected Julia: {eq}");
+        assert!(eq.contains("-0.7"), "expected cx in equation: {eq}");
+    }
+
+    #[test]
+    fn fractal_payload_roundtrip() {
+        // FractalPayload::to_bytes writes 41 bytes (1+4+4+8+8+8+8).
+        // Parse requires at least SIZE(45) bytes, so we pad to satisfy it.
+        let original = FractalPayload {
+            fractal_type: 0,
+            max_iterations: 512,
+            escape_radius: 4.0,
+            center_x: -0.75,
+            center_y: 0.1,
+            julia_cx: 0.0,
+            julia_cy: 0.0,
+        };
+        let mut bytes = original.to_bytes();
+        // Pad up to FractalPayload::SIZE so parse() is satisfied
+        while bytes.len() < FractalPayload::SIZE {
+            bytes.push(0);
+        }
+        let parsed = FractalPayload::parse(&bytes).unwrap();
+        assert_eq!(parsed.fractal_type, 0);
+        assert_eq!(parsed.max_iterations, 512);
+        assert!((parsed.center_x - -0.75).abs() < 1e-10);
+    }
+
+    // ── AliceMetadata ────────────────────────────────────────────────
+
+    #[test]
+    fn metadata_parse_empty() {
+        let m = AliceMetadata::parse(b"").unwrap();
+        assert!(m.sensor_id.is_none());
+        assert!(m.timestamp.is_none());
+    }
+
+    #[test]
+    fn metadata_parse_sensor_id_and_unit() {
+        let json = br#"{"sensor_id":"TEMP-001","unit":"C"}"#;
+        let m = AliceMetadata::parse(json).unwrap();
+        assert_eq!(m.sensor_id.as_deref(), Some("TEMP-001"));
+        assert_eq!(m.unit.as_deref(), Some("C"));
+    }
+
+    #[test]
+    fn metadata_to_json_roundtrip() {
+        let m = AliceMetadata {
+            sensor_id: Some("S1".to_string()),
+            timestamp: Some("2026-01-01T00:00:00Z".to_string()),
+            location: Some("Tokyo".to_string()),
+            unit: Some("Pa".to_string()),
+            description: None,
+            custom: None,
+        };
+        let bytes = m.to_json();
+        assert!(!bytes.is_empty());
+        let reparsed = AliceMetadata::parse(&bytes).unwrap();
+        assert_eq!(reparsed.sensor_id.as_deref(), Some("S1"));
+        assert_eq!(reparsed.unit.as_deref(), Some("Pa"));
+    }
+
+    // ── AliceFileBuilder ─────────────────────────────────────────────
+
+    #[test]
+    fn builder_no_payload_errors() {
+        let builder = AliceFileBuilder::new(AliceContentType::Polynomial);
+        assert!(
+            builder.build().is_err(),
+            "build without payload should fail"
+        );
+    }
+
+    #[test]
+    fn builder_mandelbrot_payload_values() {
+        // Verify that the Mandelbrot builder sets the correct payload values
+        // without relying on byte-level roundtrip (SIZE vs to_bytes mismatch).
+        let file = AliceFileBuilder::mandelbrot(256, -0.5, 0.0)
+            .build()
+            .unwrap();
+        assert_eq!(file.header.content_type, AliceContentType::Fractal);
+        if let AlicePayload::Fractal(p) = &file.payload {
+            assert_eq!(p.fractal_type, 0);
+            assert_eq!(p.max_iterations, 256);
+            assert!((p.center_x - -0.5).abs() < 1e-10);
+            assert!((p.escape_radius - 2.0).abs() < 1e-5);
+        } else {
+            panic!("Expected Fractal payload");
+        }
+    }
+
+    #[test]
+    fn builder_julia_roundtrip() {
+        let file = AliceFileBuilder::julia(100, -0.7, 0.27).build().unwrap();
+        if let AlicePayload::Fractal(p) = &file.payload {
+            assert_eq!(p.fractal_type, 1);
+            assert!((p.julia_cx - -0.7).abs() < 1e-10);
+            assert!((p.julia_cy - 0.27).abs() < 1e-10);
+        } else {
+            panic!("Expected Fractal payload");
+        }
+    }
+
+    #[test]
+    fn builder_perlin_roundtrip() {
+        let file = AliceFileBuilder::perlin(999, 2.5, 6).build().unwrap();
+        assert_eq!(file.header.content_type, AliceContentType::Perlin);
+        if let AlicePayload::Perlin(p) = &file.payload {
+            assert_eq!(p.seed, 999);
+            assert_eq!(p.octaves, 6);
+        } else {
+            panic!("Expected Perlin payload");
+        }
+    }
+
+    #[test]
+    fn alice_file_content_type_name_linear() {
+        let file = AliceFileBuilder::from_linear(1, 0, 10).build().unwrap();
+        assert_eq!(file.content_type_name(), "Linear");
     }
 }

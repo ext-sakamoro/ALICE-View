@@ -389,7 +389,7 @@ impl SdfPipeline {
     /// Check if dynamic SDF is loaded
     // Called by Renderer::has_dynamic_sdf() for external queries.
     #[allow(dead_code)]
-    pub fn has_dynamic_sdf(&self) -> bool {
+    pub const fn has_dynamic_sdf(&self) -> bool {
         self.has_dynamic_sdf
     }
 

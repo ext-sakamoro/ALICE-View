@@ -143,7 +143,7 @@ impl Renderer {
         }
     }
 
-    pub fn egui_ctx(&self) -> &egui::Context {
+    pub const fn egui_ctx(&self) -> &egui::Context {
         &self.egui_ctx
     }
 
@@ -166,7 +166,7 @@ impl Renderer {
     /// Check if dynamic SDF is currently loaded
     // Available for external library consumers and future UI status indicators.
     #[allow(dead_code)]
-    pub fn has_dynamic_sdf(&self) -> bool {
+    pub const fn has_dynamic_sdf(&self) -> bool {
         self.sdf_pipeline.has_dynamic_sdf()
     }
 

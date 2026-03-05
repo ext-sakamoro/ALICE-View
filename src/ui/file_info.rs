@@ -264,44 +264,6 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn format_bytes_b() {
-        assert_eq!(format_bytes(0), "0 B");
-        assert_eq!(format_bytes(512), "512 B");
-        assert_eq!(format_bytes(1023), "1023 B");
-    }
-
-    #[test]
-    fn format_bytes_kb() {
-        let s = format_bytes(1024);
-        assert!(s.contains("KB"), "Expected KB, got: {}", s);
-    }
-
-    #[test]
-    fn format_bytes_mb() {
-        let s = format_bytes(1024 * 1024);
-        assert!(s.contains("MB"), "Expected MB, got: {}", s);
-    }
-
-    #[test]
-    fn format_bytes_gb() {
-        let s = format_bytes(1024 * 1024 * 1024);
-        assert!(s.contains("GB"), "Expected GB, got: {}", s);
-    }
-
-    #[test]
-    fn file_info_default() {
-        let info = FileInfo::default();
-        assert!(info.path.is_none());
-        assert_eq!(info.compression_ratio, 0.0);
-        assert!(info.details.is_empty());
-    }
-}
-
 /// Compact file info for status bar
 // Alternative to the full side-panel; used when screen real estate is limited.
 #[allow(dead_code)]
@@ -334,4 +296,113 @@ pub fn render_compact_info(ui: &mut Ui, info: &FileInfo) {
             ui.label(RichText::new(unit).small());
         }
     });
+}
+
+#[cfg(test)]
+#[allow(clippy::float_cmp)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_bytes_b() {
+        assert_eq!(format_bytes(0), "0 B");
+        assert_eq!(format_bytes(512), "512 B");
+        assert_eq!(format_bytes(1023), "1023 B");
+    }
+
+    #[test]
+    fn format_bytes_kb() {
+        let s = format_bytes(1024);
+        assert!(s.contains("KB"), "Expected KB, got: {s}");
+    }
+
+    #[test]
+    fn format_bytes_mb() {
+        let s = format_bytes(1024 * 1024);
+        assert!(s.contains("MB"), "Expected MB, got: {s}");
+    }
+
+    #[test]
+    fn format_bytes_gb() {
+        let s = format_bytes(1024 * 1024 * 1024);
+        assert!(s.contains("GB"), "Expected GB, got: {s}");
+    }
+
+    #[test]
+    fn file_info_default() {
+        let info = FileInfo::default();
+        assert!(info.path.is_none());
+        assert_eq!(info.compression_ratio, 0.0);
+        assert!(info.details.is_empty());
+    }
+
+    #[test]
+    fn format_bytes_exact_kb_value() {
+        let s = format_bytes(1024);
+        assert!(s.starts_with("1.0 KB"), "got: {s}");
+    }
+
+    #[test]
+    fn format_bytes_exact_mb_value() {
+        let s = format_bytes(1024 * 1024);
+        assert!(s.starts_with("1.0 MB"), "got: {s}");
+    }
+
+    #[test]
+    fn format_bytes_exact_gb_value() {
+        let s = format_bytes(1024 * 1024 * 1024);
+        assert!(s.starts_with("1.00 GB"), "got: {s}");
+    }
+
+    #[test]
+    fn file_info_from_linear_alice_file() {
+        use crate::decoder::alice::AliceFileBuilder;
+        let alice_file = AliceFileBuilder::from_linear(65536, 131_072, 500)
+            .sensor_id("S42")
+            .unit("kPa")
+            .build()
+            .unwrap();
+        let info = FileInfo::from_alice_file(&alice_file, Some("/tmp/test.alice"));
+        assert_eq!(info.path.as_deref(), Some("/tmp/test.alice"));
+        assert_eq!(info.content_type, "Linear");
+        assert!(info.equation.contains("y ="), "equation: {}", info.equation);
+        assert_eq!(info.sensor_id.as_deref(), Some("S42"));
+        assert_eq!(info.unit.as_deref(), Some("kPa"));
+        assert_eq!(info.sample_count, Some(500));
+        assert!(!info.details.is_empty());
+    }
+
+    #[test]
+    fn file_info_from_fractal_alice_file() {
+        use crate::decoder::alice::AliceFileBuilder;
+        let alice_file = AliceFileBuilder::mandelbrot(128, -0.5, 0.0)
+            .build()
+            .unwrap();
+        let info = FileInfo::from_alice_file(&alice_file, None);
+        assert_eq!(info.content_type, "Fractal");
+        assert!(info.sample_count.is_none());
+        let has_type = info.details.iter().any(|(k, _)| k == "Type");
+        assert!(has_type, "fractal details should include Type");
+    }
+
+    #[test]
+    fn file_info_from_perlin_alice_file() {
+        use crate::decoder::alice::AliceFileBuilder;
+        let alice_file = AliceFileBuilder::perlin(42, 2.0, 6).build().unwrap();
+        let info = FileInfo::from_alice_file(&alice_file, None);
+        assert_eq!(info.content_type, "Perlin Noise");
+        let has_seed = info.details.iter().any(|(k, _)| k == "Seed");
+        assert!(has_seed, "perlin details should include Seed");
+    }
+
+    #[test]
+    fn file_info_sensor_id_populated_from_metadata() {
+        use crate::decoder::alice::AliceFileBuilder;
+        let alice_file = AliceFileBuilder::from_linear(0, 0, 0)
+            .sensor_id("X1")
+            .build()
+            .unwrap();
+        let info = FileInfo::from_alice_file(&alice_file, None);
+        assert_eq!(info.sensor_id.as_deref(), Some("X1"));
+    }
 }

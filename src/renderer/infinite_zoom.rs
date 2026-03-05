@@ -107,7 +107,7 @@ impl InfiniteZoomManager {
 
     /// Get current LOD level
     #[must_use]
-    pub fn current(&self) -> &LodLevel {
+    pub const fn current(&self) -> &LodLevel {
         &self.current_lod
     }
 

@@ -84,9 +84,9 @@ impl SdfContent {
             for iy in 0..resolution {
                 for ix in 0..resolution {
                     let p = Vec3::new(
-                        -2.0 + ix as f32 * step,
-                        -2.0 + iy as f32 * step,
-                        -2.0 + iz as f32 * step,
+                        (ix as f32).mul_add(step, -2.0),
+                        (iy as f32).mul_add(step, -2.0),
+                        (iz as f32).mul_add(step, -2.0),
                     );
 
                     // Use alice_sdf::eval function
@@ -107,7 +107,7 @@ impl SdfContent {
     // Available for external consumers that need direct tree access.
     #[allow(dead_code)]
     #[must_use]
-    pub fn root(&self) -> &SdfNode {
+    pub const fn root(&self) -> &SdfNode {
         &self.tree.root
     }
 

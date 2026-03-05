@@ -157,3 +157,47 @@ impl Default for XRayColors {
         }
     }
 }
+
+// ── Tests ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn xray_colors_motion_positive_is_green() {
+        let colors = XRayColors::default();
+        // Green: R≈0, G=1, B=0.5
+        assert!(colors.motion_positive[1] > 0.9, "G channel should be ~1.0");
+        assert!(colors.motion_positive[0] < 0.1, "R channel should be ~0.0");
+    }
+
+    #[test]
+    fn xray_colors_frequency_high_is_yellow() {
+        let colors = XRayColors::default();
+        // Yellow: R=1, G=1, B=0
+        assert!((colors.frequency_high[0] - 1.0).abs() < 1e-5);
+        assert!((colors.frequency_high[1] - 1.0).abs() < 1e-5);
+        assert!(colors.frequency_high[2] < 1e-5);
+    }
+
+    #[test]
+    fn xray_colors_all_channels_in_range() {
+        let colors = XRayColors::default();
+        let all = [
+            colors.motion_positive,
+            colors.motion_negative,
+            colors.frequency_low,
+            colors.frequency_high,
+            colors.wireframe,
+        ];
+        for channel in &all {
+            for &v in channel {
+                assert!(
+                    (0.0..=1.0).contains(&v),
+                    "color channel {v} out of [0,1] range"
+                );
+            }
+        }
+    }
+}

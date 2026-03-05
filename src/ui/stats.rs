@@ -67,7 +67,7 @@ impl StatsCollector {
     // Available for external UI components that want to render a fixed-size graph.
     #[allow(dead_code)]
     #[must_use]
-    pub fn capacity(&self) -> usize {
+    pub const fn capacity(&self) -> usize {
         self.frame_times.len()
     }
 }
@@ -119,7 +119,7 @@ pub fn render_stats_overlay(
                         let idx = (collector.head + i) % history_len;
                         let ms = collector.frame_times[idx];
 
-                        let x = rect.min.x + (i as f32 / history_len as f32) * rect.width();
+                        let x = (i as f32 / history_len as f32).mul_add(rect.width(), rect.min.x);
                         // Scale: 0ms = bottom, 33ms (30fps) = top
                         let h = (ms * MS_SCALE_RCP).min(1.0);
                         let y = rect.max.y - h * rect.height();
@@ -135,7 +135,7 @@ pub fn render_stats_overlay(
                     }
 
                     // Target line (16.6ms / 60fps)
-                    let target_y = rect.max.y - (16.6 * MS_SCALE_RCP) * rect.height();
+                    let target_y = (16.6 * MS_SCALE_RCP).mul_add(-rect.height(), rect.max.y);
                     ui.painter().line_segment(
                         [
                             Pos2::new(rect.min.x, target_y),
@@ -145,7 +145,7 @@ pub fn render_stats_overlay(
                     );
 
                     // 30fps warning line
-                    let warn_y = rect.max.y - 1.0 * rect.height();
+                    let warn_y = 1.0f32.mul_add(-rect.height(), rect.max.y);
                     ui.painter().line_segment(
                         [Pos2::new(rect.min.x, warn_y), Pos2::new(rect.max.x, warn_y)],
                         Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 100, 100, 50)),

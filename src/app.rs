@@ -125,7 +125,7 @@ pub enum QualityPreset {
 impl QualityPreset {
     /// Display name of this preset
     #[must_use]
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Fast => "Fast",
             Self::Balanced => "Balanced",
@@ -136,7 +136,7 @@ impl QualityPreset {
 
     /// All available presets in order
     #[must_use]
-    pub fn all() -> &'static [Self] {
+    pub const fn all() -> &'static [Self] {
         &[Self::Fast, Self::Balanced, Self::Quality, Self::Ultra]
     }
 }
@@ -239,7 +239,7 @@ impl ViewerState {
     }
 
     /// Apply a quality preset, updating `max_steps`, epsilon, and AO accordingly
-    pub fn apply_quality_preset(&mut self, preset: QualityPreset) {
+    pub const fn apply_quality_preset(&mut self, preset: QualityPreset) {
         self.sdf_quality_preset = preset;
         match preset {
             QualityPreset::Fast => {
@@ -688,9 +688,7 @@ impl App {
                     if !self.egui_wants_pointer() {
                         let scroll = match delta {
                             winit::event::MouseScrollDelta::LineDelta(_, y) => y,
-                            winit::event::MouseScrollDelta::PixelDelta(pos) => {
-                                pos.y as f32 / 100.0
-                            }
+                            winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 / 100.0,
                         };
                         self.handle_scroll(scroll);
                     }
@@ -841,7 +839,7 @@ mod tests {
         let mut cam = Camera3D::default();
         cam.dolly(100.0);
         let dist = (cam.target - cam.position).length();
-        assert!(dist >= 0.4, "Distance {} too small", dist);
+        assert!(dist >= 0.4, "Distance {dist} too small");
     }
 
     #[test]
@@ -863,9 +861,7 @@ mod tests {
         let dist_after = (cam.position - cam.target).length();
         assert!(
             (dist_before - dist_after).abs() < 1e-4,
-            "Distance changed: {} -> {}",
-            dist_before,
-            dist_after
+            "Distance changed: {dist_before} -> {dist_after}"
         );
     }
 
@@ -875,7 +871,7 @@ mod tests {
         let pos_before = cam.position;
         cam.orbit(0.5, 0.0);
         let moved = (cam.position - pos_before).length();
-        assert!(moved > 0.01, "Camera didn't move: delta={}", moved);
+        assert!(moved > 0.01, "Camera didn't move: delta={moved}");
     }
 
     // ── ViewerConfig ────────────────────────────────────────────────

@@ -116,7 +116,7 @@ pub struct Decoder {
 #[allow(dead_code)]
 impl Decoder {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             content_type: ContentType::None,
             content: None,
@@ -130,13 +130,13 @@ impl Decoder {
 
     /// Get loaded SDF content (if available)
     #[must_use]
-    pub fn sdf_content(&self) -> Option<&asdf::SdfContent> {
+    pub const fn sdf_content(&self) -> Option<&asdf::SdfContent> {
         self.sdf_content.as_ref()
     }
 
     /// Get loaded ALICE file (if available)
     #[must_use]
-    pub fn alice_file(&self) -> Option<&alice::AliceFile> {
+    pub const fn alice_file(&self) -> Option<&alice::AliceFile> {
         self.alice_file.as_ref()
     }
 
@@ -304,7 +304,7 @@ impl Decoder {
                     // Convert to Perlin visualization with slope as scale
                     ProceduralContent::Perlin {
                         seed: p.slope_q16 as u64,
-                        scale: p.slope_f32().abs() * 10.0 + 1.0,
+                        scale: p.slope_f32().abs().mul_add(10.0, 1.0),
                         octaves: 6,
                         persistence: 0.5,
                         lacunarity: 2.0,
@@ -436,13 +436,13 @@ impl Decoder {
 
     /// Get content type
     #[must_use]
-    pub fn content_type(&self) -> ContentType {
+    pub const fn content_type(&self) -> ContentType {
         self.content_type
     }
 
     /// Get procedural content
     #[must_use]
-    pub fn content(&self) -> Option<&ProceduralContent> {
+    pub const fn content(&self) -> Option<&ProceduralContent> {
         self.content.as_ref()
     }
 
@@ -464,7 +464,7 @@ impl Decoder {
 
     /// Check if content is procedural (infinite zoom capable)
     #[must_use]
-    pub fn is_procedural(&self) -> bool {
+    pub const fn is_procedural(&self) -> bool {
         matches!(
             self.content,
             Some(
@@ -539,5 +539,58 @@ mod tests {
         for t in &types {
             assert_eq!(*t, *t);
         }
+    }
+
+    #[test]
+    fn decoder_default_equals_new() {
+        let d = Decoder::default();
+        assert_eq!(d.content_type(), ContentType::None);
+        assert!(d.file_path().is_none());
+    }
+
+    #[test]
+    fn decoder_is_procedural_false_for_raster() {
+        let mut d = Decoder::new();
+        d.content = Some(ProceduralContent::Raster {
+            width: 4,
+            height: 4,
+            data: std::sync::Arc::new(vec![0u8; 64]),
+        });
+        assert!(!d.is_procedural(), "Raster should not be procedural");
+    }
+
+    #[test]
+    fn decoder_is_procedural_true_for_fractal() {
+        let mut d = Decoder::new();
+        d.content = Some(ProceduralContent::Fractal {
+            fractal_type: FractalType::Mandelbrot,
+            max_iterations: 256,
+            escape_radius: 2.0,
+            center: glam::DVec2::ZERO,
+            julia_c: None,
+        });
+        assert!(d.is_procedural());
+    }
+
+    #[test]
+    fn decoder_is_procedural_true_for_perlin() {
+        let mut d = Decoder::new();
+        d.content = Some(ProceduralContent::Perlin {
+            seed: 1,
+            scale: 1.0,
+            octaves: 4,
+            persistence: 0.5,
+            lacunarity: 2.0,
+        });
+        assert!(d.is_procedural());
+    }
+
+    #[test]
+    fn decoder_compression_ratio_nonzero_when_loaded() {
+        let mut d = Decoder::new();
+        d.original_size = 1000;
+        d.compressed_size = 100;
+        let ratio = d.compression_ratio();
+        assert!((ratio - 10.0).abs() < 1e-5, "ratio={ratio}");
     }
 }
