@@ -86,6 +86,7 @@ pub mod app;
 #[cfg(feature = "db")]
 pub mod db_bridge;
 pub mod decoder;
+pub mod perf;
 #[cfg(feature = "physics")]
 pub mod physics_bridge;
 pub mod renderer;
@@ -97,6 +98,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 // Re-export key types
 pub use app::{App, FrameStats, ViewerConfig, ViewerState, XRayType};
 pub use decoder::Decoder;
+pub use perf::{FrameTimer, PerfCounter, PerfStats};
 
 /// Launch the ALICE-View window with the given configuration.
 ///
