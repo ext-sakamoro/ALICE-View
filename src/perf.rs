@@ -115,8 +115,8 @@ impl FrameTimer {
         }
         let mut sorted: Vec<Duration> = slice.to_vec();
         sorted.sort_unstable();
-        let idx = ((sorted.len() as f64 * percentile.clamp(0.0, 1.0)) as usize)
-            .min(sorted.len() - 1);
+        let idx =
+            ((sorted.len() as f64 * percentile.clamp(0.0, 1.0)) as usize).min(sorted.len() - 1);
         sorted[idx].as_secs_f64() * 1000.0
     }
 
