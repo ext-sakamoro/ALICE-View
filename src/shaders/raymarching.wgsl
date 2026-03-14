@@ -143,6 +143,9 @@ fn op_repeat(p: vec3<f32>, c: vec3<f32>) -> vec3<f32> {
 fn sdf_eval_dynamic(p: vec3<f32>) -> f32 {
     return length(p) - 1.0;  // Simple sphere fallback
 }
+fn sdf_material_dynamic(p: vec3<f32>) -> f32 {
+    return 0.0;
+}
 
 // ============================================
 // Demo Scenes SDF (6 scenes)
@@ -392,8 +395,41 @@ fn shade(p: vec3<f32>, n: vec3<f32>, rd: vec3<f32>, hit_dist: f32) -> vec3<f32> 
         ao = calc_ao(p, n, hit_dist);
     }
 
-    // Material color (gradient based on position)
-    let base_color = vec3<f32>(0.7, 0.5, 0.4) + 0.3 * cos(p * 0.5 + vec3<f32>(0.0, 1.0, 2.0));
+    // Material color: use material ID if dynamic SDF is loaded (scene_id == 100)
+    var base_color: vec3<f32>;
+    if (uniforms.scene_id == 100u) {
+        let mat_id = sdf_material_dynamic(p);
+        if (mat_id > 0.5 && mat_id < 1.5) {
+            // Material 1: Dark Steel (刃)
+            base_color = vec3<f32>(0.25, 0.27, 0.30);
+        } else if (mat_id > 1.5 && mat_id < 2.5) {
+            // Material 2: Gold (鍔・柄)
+            base_color = vec3<f32>(0.83, 0.69, 0.22);
+        } else if (mat_id > 2.5 && mat_id < 3.5) {
+            // Material 3: Crystal / Materia (魔石 - 自発光)
+            base_color = vec3<f32>(0.15, 0.55, 0.95);
+        } else if (mat_id > 3.5 && mat_id < 4.5) {
+            // Material 4: Copper
+            base_color = vec3<f32>(0.72, 0.45, 0.20);
+        } else if (mat_id > 4.5 && mat_id < 5.5) {
+            // Material 5: Emerald
+            base_color = vec3<f32>(0.07, 0.60, 0.35);
+        } else if (mat_id > 5.5 && mat_id < 6.5) {
+            // Material 6: Ruby
+            base_color = vec3<f32>(0.78, 0.08, 0.18);
+        } else if (mat_id > 6.5 && mat_id < 7.5) {
+            // Material 7: Silver
+            base_color = vec3<f32>(0.75, 0.75, 0.78);
+        } else if (mat_id > 7.5 && mat_id < 8.5) {
+            // Material 8: Obsidian
+            base_color = vec3<f32>(0.05, 0.05, 0.08);
+        } else {
+            // Default: position-based gradient
+            base_color = vec3<f32>(0.7, 0.5, 0.4) + 0.3 * cos(p * 0.5 + vec3<f32>(0.0, 1.0, 2.0));
+        }
+    } else {
+        base_color = vec3<f32>(0.7, 0.5, 0.4) + 0.3 * cos(p * 0.5 + vec3<f32>(0.0, 1.0, 2.0));
+    }
 
     // Combine
     var color = base_color * (
@@ -406,6 +442,15 @@ fn shade(p: vec3<f32>, n: vec3<f32>, rd: vec3<f32>, hit_dist: f32) -> vec3<f32> 
     color += spec1 * light1_color * 0.5;
     color += rim * vec3<f32>(0.5, 0.6, 0.7);
     color *= ao;
+
+    // Emission for crystal/materia materials (material 3)
+    if (uniforms.scene_id == 100u) {
+        let mat_id = sdf_material_dynamic(p);
+        if (mat_id > 2.5 && mat_id < 3.5) {
+            let pulse = sin(uniforms.time * 2.0 + p.y * 4.0) * 0.3 + 0.7;
+            color += vec3<f32>(0.2, 0.5, 1.0) * pulse * 0.6;
+        }
+    }
 
     return color;
 }

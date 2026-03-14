@@ -341,22 +341,33 @@ impl SdfPipeline {
     /// New `SdfPipeline` with dynamic SDF embedded
     #[must_use]
     pub fn rebuild_with_dynamic_sdf(&self, device: &Device, sdf_wgsl: &str) -> Self {
-        // ヘルパー関数と sdf_eval 本体を分離
-        let (helpers, body) = Self::split_helpers_and_body(sdf_wgsl);
+        // ヘルパー、sdf_eval本体、マテリアル関数を分離
+        let (helpers, body, material_fn) = Self::split_helpers_body_material(sdf_wgsl);
 
-        // ヘルパー + sdf_eval_dynamic を結合
+        // マテリアル関数がある場合は sdf_material_dynamic も生成
+        let material_section = if material_fn.is_empty() {
+            "fn sdf_material_dynamic(p: vec3<f32>) -> f32 { return 0.0; }".to_string()
+        } else {
+            // sdf_eval_material → sdf_material_dynamic にリネーム
+            let renamed = material_fn.replace("sdf_eval_material", "sdf_material_dynamic");
+            format!("{}\n", renamed)
+        };
+
+        // ヘルパー + sdf_eval_dynamic + sdf_material_dynamic を結合
         let dynamic_function = format!(
             "{helpers}\n\
              // Dynamic SDF loaded from file\n\
              fn sdf_eval_dynamic(p: vec3<f32>) -> f32 {{\n\
              {body}\n\
-             }}",
+             }}\n\n\
+             {material_section}",
             helpers = helpers,
             body = body,
+            material_section = material_section,
         );
 
         let shader_source = RAYMARCHING_TEMPLATE.replace(
-            "// {{DYNAMIC_SDF_FUNCTION}}\n// Default fallback when no .asdf is loaded\nfn sdf_eval_dynamic(p: vec3<f32>) -> f32 {\n    return length(p) - 1.0;  // Simple sphere fallback\n}",
+            "// {{DYNAMIC_SDF_FUNCTION}}\n// Default fallback when no .asdf is loaded\nfn sdf_eval_dynamic(p: vec3<f32>) -> f32 {\n    return length(p) - 1.0;  // Simple sphere fallback\n}\nfn sdf_material_dynamic(p: vec3<f32>) -> f32 {\n    return 0.0;\n}",
             &dynamic_function,
         );
 
@@ -380,22 +391,43 @@ impl SdfPipeline {
     ///
     /// ヘルパーはテンプレートのプレースホルダー上方に挿入し、
     /// 本体のみ `sdf_eval_dynamic` に詰め替える。
-    fn split_helpers_and_body(sdf_wgsl: &str) -> (String, String) {
+    /// (ヘルパー関数群, sdf_eval本体, マテリアル関数群) を返す
+    fn split_helpers_body_material(sdf_wgsl: &str) -> (String, String, String) {
         // "fn sdf_eval(" の位置でヘルパーと本体を分離
         if let Some(eval_pos) = sdf_wgsl.find("fn sdf_eval(") {
             let helpers = sdf_wgsl[..eval_pos].trim().to_string();
-            let eval_fn = &sdf_wgsl[eval_pos..];
-            // 本体を抽出 (最初の { から最後の } まで)
-            if let Some(start) = eval_fn.find('{') {
-                if let Some(end) = eval_fn.rfind('}') {
-                    let body = eval_fn[start + 1..end].trim().to_string();
-                    return (helpers, body);
+            let after_helpers = &sdf_wgsl[eval_pos..];
+
+            // sdf_eval 関数の終わり（最初の "}\n" の直後）を見つける
+            // sdf_eval の本体を抽出
+            let mut brace_depth = 0i32;
+            let mut eval_end = after_helpers.len();
+            let mut found_start = false;
+            for (i, c) in after_helpers.char_indices() {
+                if c == '{' {
+                    brace_depth += 1;
+                    found_start = true;
+                } else if c == '}' {
+                    brace_depth -= 1;
+                    if found_start && brace_depth == 0 {
+                        eval_end = i + 1;
+                        break;
+                    }
                 }
             }
-            (helpers, eval_fn.to_string())
+
+            let eval_fn = &after_helpers[..eval_end];
+            let material_section = after_helpers[eval_end..].trim().to_string();
+
+            // sdf_eval の本体を抽出
+            if let Some(start) = eval_fn.find('{') {
+                let body = eval_fn[start + 1..eval_end - 1].trim().to_string();
+                return (helpers, body, material_section);
+            }
+
+            (helpers, eval_fn.to_string(), material_section)
         } else {
-            // sdf_eval が見つからない場合はフォールバック
-            (String::new(), sdf_wgsl.to_string())
+            (String::new(), sdf_wgsl.to_string(), String::new())
         }
     }
 

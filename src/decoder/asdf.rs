@@ -141,19 +141,26 @@ impl SdfContent {
         &self.tree.root
     }
 
-    /// Generate WGSL shader code for this SDF
+    /// Generate WGSL shader code for this SDF (distance + material evaluation)
     ///
     /// Uses ALICE-SDF's `WgslShader` transpiler to convert the SDF tree
     /// to optimized WGSL code for GPU evaluation.
+    /// `WithMaterial` が含まれる場合、`sdf_eval_material(p) -> f32` も生成する。
     pub fn to_wgsl(&self) -> String {
         let shader = WgslShader::transpile(&self.tree.root, TranspileMode::Hardcoded);
+        let mat_fn = WgslShader::transpile_material(&self.tree.root, TranspileMode::Hardcoded);
         tracing::info!(
-            "Transpiled SDF to WGSL: {} nodes → {} bytes, {} helpers",
+            "Transpiled SDF to WGSL: {} nodes → {} bytes, {} helpers, material_fn: {} bytes",
             self.node_count,
             shader.source.len(),
-            shader.helper_count
+            shader.helper_count,
+            mat_fn.len(),
         );
-        shader.source
+        if mat_fn.is_empty() {
+            shader.source
+        } else {
+            format!("{}\n{}", shader.source, mat_fn)
+        }
     }
 
     /// Get the raw WGSL source with metadata
