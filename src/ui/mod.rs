@@ -196,7 +196,7 @@ impl Ui {
         thread::spawn(move || {
             // Runs in background - UI continues rendering at full speed
             if let Some(path) = rfd::FileDialog::new()
-                .add_filter("ALICE SDF", &["asdf", "json"])
+                .add_filter("ALICE SDF", &["asdf", "json", "lol"])
                 .add_filter("ALICE Files", &["alz", "alice", "asp"])
                 .add_filter("Images", &["png", "jpg", "jpeg", "bmp"])
                 .add_filter("All Files", &["*"])
