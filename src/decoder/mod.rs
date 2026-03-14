@@ -155,8 +155,8 @@ impl Decoder {
             .to_lowercase();
         let path_str_cow = p.to_string_lossy();
 
-        // ASDF/SDF files: load synchronously (avoids Tokio runtime requirement)
-        if path_str_cow.ends_with(".asdf.json") || path_str_cow.ends_with(".asdf") || ext == "json"
+        // ASDF/SDF/LOL files: load synchronously (avoids Tokio runtime requirement)
+        if path_str_cow.ends_with(".asdf.json") || path_str_cow.ends_with(".asdf") || ext == "json" || ext == "lol"
         {
             return self.load_asdf_sync(path);
         }
