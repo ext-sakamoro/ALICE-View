@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ALICE-View
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ext-sakamoro/ALICE-SDF
+          path: ALICE-SDF
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ALICE-View
+
+      - name: Create dependency stubs
+        shell: bash
+        run: |
+          # SDF optional deps
+          for crate_info in \
+            "ALICE-Physics:alice-physics" \
+            "ALICE-Codec:alice-codec" \
+            "ALICE-Streaming-Protocol:libasp" \
+            "ALICE-Cache:alice-cache"; do
+            dir=$(echo "$crate_info" | cut -d: -f1)
+            pkg=$(echo "$crate_info" | cut -d: -f2)
+            mkdir -p "$dir/src"
+            cat > "$dir/Cargo.toml" << TOML
+          [package]
+          name = "$pkg"
+          version = "0.1.0"
+          edition = "2021"
+          [lib]
+          path = "src/lib.rs"
+          TOML
+            echo "" > "$dir/src/lib.rs"
+          done
+
+          # ALICE-LOL (nested path)
+          mkdir -p "ALICE-LOL/alice-lol/src"
+          cat > "ALICE-LOL/alice-lol/Cargo.toml" << TOML
+          [package]
+          name = "alice-lol"
+          version = "0.1.0"
+          edition = "2021"
+          [lib]
+          path = "src/lib.rs"
+          TOML
+          echo "" > "ALICE-LOL/alice-lol/src/lib.rs"
+
+          # View optional deps
+          for crate_info in \
+            "ALICE-Analytics:alice-analytics" \
+            "ALICE-DB:alice-db"; do
+            dir=$(echo "$crate_info" | cut -d: -f1)
+            pkg=$(echo "$crate_info" | cut -d: -f2)
+            mkdir -p "$dir/src"
+            cat > "$dir/Cargo.toml" << TOML
+          [package]
+          name = "$pkg"
+          version = "0.1.0"
+          edition = "2021"
+          [lib]
+          path = "src/lib.rs"
+          TOML
+            echo "" > "$dir/src/lib.rs"
+          done
+
+      - name: Build (default)
+        working-directory: ALICE-View
+        run: cargo build --lib
+
+      - name: Test
+        working-directory: ALICE-View
+        run: cargo test --lib
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt -- --check
