@@ -393,7 +393,11 @@ impl App {
     pub fn new(initial_file: Option<String>) -> Self {
         // Auto-detect render mode from file extension
         let render_mode = initial_file.as_ref().map_or(RenderMode::Procedural2D, |f| {
-            if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") || f.ends_with(".lol") {
+            if f.ends_with(".asdf")
+                || f.ends_with(".asdf.json")
+                || f.ends_with(".json")
+                || f.ends_with(".lol")
+            {
                 RenderMode::Sdf3D
             } else {
                 RenderMode::Procedural2D
@@ -422,7 +426,11 @@ impl App {
             .initial_file
             .as_ref()
             .map_or(RenderMode::Procedural2D, |f| {
-                if f.ends_with(".asdf") || f.ends_with(".asdf.json") || f.ends_with(".json") || f.ends_with(".lol") {
+                if f.ends_with(".asdf")
+                    || f.ends_with(".asdf.json")
+                    || f.ends_with(".json")
+                    || f.ends_with(".lol")
+                {
                     RenderMode::Sdf3D
                 } else {
                     RenderMode::Procedural2D

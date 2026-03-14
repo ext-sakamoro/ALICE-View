@@ -179,7 +179,10 @@ impl SdfContent {
 #[must_use]
 pub fn is_asdf_file(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
-    path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json") || path_str.ends_with(".json") || path_str.ends_with(".lol")
+    path_str.ends_with(".asdf")
+        || path_str.ends_with(".asdf.json")
+        || path_str.ends_with(".json")
+        || path_str.ends_with(".lol")
 }
 
 #[cfg(test)]
