@@ -341,13 +341,18 @@ impl SdfPipeline {
     /// New `SdfPipeline` with dynamic SDF embedded
     #[must_use]
     pub fn rebuild_with_dynamic_sdf(&self, device: &Device, sdf_wgsl: &str) -> Self {
-        // Generate dynamic shader by replacing placeholder
+        // ヘルパー関数と sdf_eval 本体を分離
+        let (helpers, body) = Self::split_helpers_and_body(sdf_wgsl);
+
+        // ヘルパー + sdf_eval_dynamic を結合
         let dynamic_function = format!(
-            "// Dynamic SDF loaded from .asdf file\n\
+            "{helpers}\n\
+             // Dynamic SDF loaded from file\n\
              fn sdf_eval_dynamic(p: vec3<f32>) -> f32 {{\n\
-             {}\n\
+             {body}\n\
              }}",
-            Self::convert_sdf_eval_to_dynamic(sdf_wgsl)
+            helpers = helpers,
+            body = body,
         );
 
         let shader_source = RAYMARCHING_TEMPLATE.replace(
@@ -363,27 +368,35 @@ impl SdfPipeline {
         Self::new_with_shader(device, self.format, &shader_source, true)
     }
 
-    /// Convert `sdf_eval` function body to `sdf_eval_dynamic`
-    /// The ALICE-SDF transpiler generates `fn sdf_eval(p: vec3<f32>) -> f32 { ... }`
-    /// We need to extract the body and rename variables if needed
-    fn convert_sdf_eval_to_dynamic(sdf_wgsl: &str) -> String {
-        // Find the function body between { and the last }
-        // The transpiler output looks like:
-        // fn sdf_eval(p: vec3<f32>) -> f32 {
-        //     let d0 = ...;
-        //     return d0;
-        // }
-
-        // Extract content between first { and last }
-        if let Some(start) = sdf_wgsl.find('{') {
-            if let Some(end) = sdf_wgsl.rfind('}') {
-                let body = &sdf_wgsl[start + 1..end];
-                return body.trim().to_string();
+    /// WGSL ソースからヘルパー関数群と sdf_eval 本体を分離する。
+    ///
+    /// トランスパイラ出力は以下の形式:
+    /// ```wgsl
+    /// fn sdf_diamond(...) { ... }   // ← ヘルパー (0個以上)
+    /// fn sdf_eval(p: vec3<f32>) -> f32 {
+    ///     ...                        // ← 本体
+    /// }
+    /// ```
+    ///
+    /// ヘルパーはテンプレートのプレースホルダー上方に挿入し、
+    /// 本体のみ `sdf_eval_dynamic` に詰め替える。
+    fn split_helpers_and_body(sdf_wgsl: &str) -> (String, String) {
+        // "fn sdf_eval(" の位置でヘルパーと本体を分離
+        if let Some(eval_pos) = sdf_wgsl.find("fn sdf_eval(") {
+            let helpers = sdf_wgsl[..eval_pos].trim().to_string();
+            let eval_fn = &sdf_wgsl[eval_pos..];
+            // 本体を抽出 (最初の { から最後の } まで)
+            if let Some(start) = eval_fn.find('{') {
+                if let Some(end) = eval_fn.rfind('}') {
+                    let body = eval_fn[start + 1..end].trim().to_string();
+                    return (helpers, body);
+                }
             }
+            (helpers, eval_fn.to_string())
+        } else {
+            // sdf_eval が見つからない場合はフォールバック
+            (String::new(), sdf_wgsl.to_string())
         }
-
-        // Fallback: return the whole thing and hope it works
-        sdf_wgsl.to_string()
     }
 
     /// Check if dynamic SDF is loaded
