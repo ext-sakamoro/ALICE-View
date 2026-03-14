@@ -23,7 +23,7 @@ ALICE-View is a high-performance real-time 3D SDF visualizer and procedural rend
 
 Real-time GPU raymarching of SDF (Signed Distance Function) models via WGSL shaders transpiled by ALICE-SDF.
 
-- Load `.json`, `.asdf`, `.asdf.json` SDF files
+- Load `.json`, `.asdf`, `.asdf.json`, `.lol` (LOL DSL) files
 - Drag & drop files onto the window
 - Orbit camera with mouse, WASD movement
 - Adjustable lighting (direction, intensity, ambient, background color)
@@ -104,6 +104,7 @@ xattr -cr alice-view alice-create
 ```bash
 alice-view model.json
 alice-view scene.asdf
+alice-view sword.lol       # LOL DSL テキストファイル
 ```
 
 ### Reopen last file
@@ -125,7 +126,7 @@ alice-view
 alice-view [OPTIONS] [FILE]
 
 Arguments:
-  [FILE]         SDF file to open (.json, .asdf, .asdf.json)
+  [FILE]         SDF file to open (.json, .asdf, .asdf.json, .lol)
 
 Options:
   --last         Reopen last opened file
@@ -169,6 +170,7 @@ Options:
 | `.json` | SDF JSON (ALICE-SDF) | 3D Raymarching |
 | `.asdf` | ALICE-SDF Binary | 3D Raymarching |
 | `.asdf.json` | ALICE-SDF JSON | 3D Raymarching |
+| `.lol` | [ALICE-LOL](https://github.com/ext-sakamoro/ALICE-LOL) DSL | 3D Raymarching |
 | `.alz` / `.alice` | ALICE-Zip Archive | 2D Procedural |
 | `.asp` | ALICE Streaming | 2D Procedural |
 | `.png`, `.jpg` | Standard Images | Raster fallback |
@@ -186,9 +188,10 @@ Options:
 │         │                  │                    │            │
 │         ▼                  ▼                    ▼            │
 │  ┌────────────────────────────────────────────────────┐     │
-│  │              ALICE-SDF Integration                  │     │
-│  │  SdfTree → WgslShader (transpile) → GPU Raymarch   │     │
-│  │  SdfTree → MarchingCubes → GLB/OBJ Export          │     │
+│  │              ALICE-SDF + ALICE-LOL Integration         │     │
+│  │  .lol → parse_lol() → SdfNode                        │     │
+│  │  SdfTree → WgslShader (transpile) → GPU Raymarch      │     │
+│  │  SdfTree → MarchingCubes → GLB/OBJ Export             │     │
 │  └────────────────────────────────────────────────────┘     │
 │         │                                                    │
 │         ▼                                                    │
@@ -207,6 +210,7 @@ Options:
 | **Language** | Rust |
 | **Graphics** | wgpu (WebGPU) |
 | **SDF Engine** | [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF) |
+| **SDF DSL** | [ALICE-LOL](https://github.com/ext-sakamoro/ALICE-LOL) (120 constructs) |
 | **UI** | egui |
 | **Math** | glam |
 | **Allocator** | mimalloc |
@@ -238,6 +242,7 @@ ALICE-View connects to other ALICE ecosystem crates via feature-gated bridge mod
 
 | Bridge | Feature | Target Crate | Description |
 |--------|---------|--------------|-------------|
+| LOL loader | `lol` (default) | [ALICE-LOL](https://github.com/ext-sakamoro/ALICE-LOL) | `.lol` DSL file loading via `runtime_parser::parse_lol()` |
 | `analytics_bridge` | `analytics` | [ALICE-Analytics](../ALICE-Analytics) | Real-time rendering performance analytics |
 | `physics_bridge` | `physics` | [ALICE-Physics](../ALICE-Physics) | Interactive physics debug overlay visualization |
 | `db_bridge` | `db` | [ALICE-DB](../ALICE-DB) | Time-series DB query to plot data for GPU overlay |
@@ -251,6 +256,7 @@ Standardized `[profile.bench]` added for consistent benchmarking across ALICE cr
 | Project | Description |
 |---------|-------------|
 | [ALICE-SDF](https://github.com/ext-sakamoro/ALICE-SDF) | SDF library with 126 primitives/ops, SIMD eval, mesh export, WGSL/HLSL/GLSL transpilers |
+| [ALICE-LOL](https://github.com/ext-sakamoro/ALICE-LOL) | Law-Oriented Language — 120-construct DSL for declarative SDF scene authoring |
 | [Open Source SDF Assets](https://github.com/ext-sakamoro/Open-Source-SDF-Assets) | 991 free CC0 3D assets in .asdf.json format |
 | [ALICE-Zip](https://github.com/ext-sakamoro/ALICE-Zip) | Core procedural compression engine |
 | [ALICE-DB](https://github.com/ext-sakamoro/ALICE-DB) | Model-based time-series database |
