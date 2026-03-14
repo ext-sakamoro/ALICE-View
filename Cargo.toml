@@ -32,6 +32,9 @@ noise = "0.9"
 # ALICE-SDF Integration (3D raymarching with WGSL transpiler)
 alice-sdf = { path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
 
+# ALICE-LOL Integration (LOL DSL runtime parser)
+alice-lol = { path = "../ALICE-LOL/alice-lol", optional = true }
+
 # Logging
 log = "0.4"
 
@@ -56,7 +59,8 @@ alice-physics = { path = "../ALICE-Physics", optional = true, default-features =
 alice-db = { path = "../ALICE-DB", optional = true, default-features = false }
 
 [features]
-default = []
+default = ["lol"]
+lol = ["dep:alice-lol"]
 analytics = ["dep:alice-analytics"]  # Rendering performance metrics (DDSketch)
 physics = ["dep:alice-physics"]      # Interactive physics visualization
 db = ["dep:alice-db"]                # Time-series DB query → plot data

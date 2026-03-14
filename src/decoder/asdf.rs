@@ -47,6 +47,16 @@ impl SdfContent {
             // (alice_sdf::load() only accepts .asdf/.asdf.json extensions)
             tracing::info!("Loading SDF JSON: {:?}", path);
             load_asdf_json(path).context("Failed to load SDF JSON")?
+        } else if extension == "lol" {
+            // LOL DSL テキストファイル
+            #[cfg(feature = "lol")]
+            {
+                tracing::info!("Loading LOL DSL: {:?}", path);
+                let text = std::fs::read_to_string(path).context("Failed to read LOL file")?;
+                return Self::from_lol(&text);
+            }
+            #[cfg(not(feature = "lol"))]
+            anyhow::bail!("LOL support not enabled (compile with --features lol)");
         } else {
             anyhow::bail!("Unknown SDF format: {extension}");
         };
@@ -103,6 +113,26 @@ impl SdfContent {
         (min, max)
     }
 
+    /// LOL DSL テキストから SdfContent を構築
+    ///
+    /// `alice_lol::runtime_parser::parse_lol()` で LOL テキストを `SdfNode` に変換し、
+    /// WGSL トランスパイル可能な `SdfContent` を返す。
+    #[cfg(feature = "lol")]
+    pub fn from_lol(text: &str) -> Result<Self> {
+        let node = alice_lol::runtime_parser::parse_lol(text)
+            .map_err(|e| anyhow::anyhow!("LOL parse error: {}", e))?;
+        let node_count = node.node_count() as usize;
+        let bounds = Self::compute_bounds(&node);
+        let tree = SdfTree::new(node);
+        tracing::info!("Parsed LOL DSL: {} nodes", node_count);
+        Ok(Self {
+            tree,
+            node_count,
+            bounds,
+            version: "lol-1.0".to_string(),
+        })
+    }
+
     /// Get the SDF root node
     // Available for external consumers that need direct tree access.
     #[allow(dead_code)]
@@ -142,7 +172,7 @@ impl SdfContent {
 #[must_use]
 pub fn is_asdf_file(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
-    path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json") || path_str.ends_with(".json")
+    path_str.ends_with(".asdf") || path_str.ends_with(".asdf.json") || path_str.ends_with(".json") || path_str.ends_with(".lol")
 }
 
 #[cfg(test)]
