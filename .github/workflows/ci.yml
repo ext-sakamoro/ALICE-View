@@ -27,6 +27,11 @@ jobs:
           repository: ext-sakamoro/ALICE-SDF
           path: ALICE-SDF
 
+      - uses: actions/checkout@v4
+        with:
+          repository: ext-sakamoro/ALICE-LOL
+          path: ALICE-LOL
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -59,18 +64,6 @@ jobs:
           TOML
             echo "" > "$dir/src/lib.rs"
           done
-
-          # ALICE-LOL (nested path)
-          mkdir -p "ALICE-LOL/alice-lol/src"
-          cat > "ALICE-LOL/alice-lol/Cargo.toml" << TOML
-          [package]
-          name = "alice-lol"
-          version = "0.1.0"
-          edition = "2021"
-          [lib]
-          path = "src/lib.rs"
-          TOML
-          echo "" > "ALICE-LOL/alice-lol/src/lib.rs"
 
           # View optional deps
           for crate_info in \
