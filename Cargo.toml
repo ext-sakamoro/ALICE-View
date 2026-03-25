@@ -2,7 +2,7 @@
 name = "alice-view"
 version = "0.3.0"
 edition = "2021"
-authors = ["Moroya Sakamoto"]
+authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
 description = "The Infinite Canvas - Real-time procedural rendering engine for ALICE ecosystem"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ext-sakamoro/ALICE-View"
