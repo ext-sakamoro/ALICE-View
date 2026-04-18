@@ -161,19 +161,19 @@ impl SdfPanel {
                 ui.add(
                     egui::DragValue::new(&mut pos.x)
                         .speed(0.1)
-                        .clamp_range(-50.0..=50.0),
+                        .range(-50.0..=50.0),
                 );
                 ui.label("Y:");
                 ui.add(
                     egui::DragValue::new(&mut pos.y)
                         .speed(0.1)
-                        .clamp_range(-50.0..=50.0),
+                        .range(-50.0..=50.0),
                 );
                 ui.label("Z:");
                 ui.add(
                     egui::DragValue::new(&mut pos.z)
                         .speed(0.1)
-                        .clamp_range(-50.0..=50.0),
+                        .range(-50.0..=50.0),
                 );
             });
             state.camera.position = pos;
@@ -270,7 +270,7 @@ impl SdfPanel {
             // Quality Preset
             ui.label(egui::RichText::new("Quality Preset").strong());
             let current_name = state.sdf_quality_preset.name();
-            egui::ComboBox::from_id_source("quality_preset")
+            egui::ComboBox::from_id_salt("quality_preset")
                 .selected_text(current_name)
                 .show_ui(ui, |ui| {
                     for preset in QualityPreset::all() {

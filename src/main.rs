@@ -23,7 +23,7 @@ mod ui;
 
 use anyhow::Result;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::EventLoop;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -159,7 +159,6 @@ fn main() -> Result<()> {
 
     // Create event loop
     let event_loop = EventLoop::new()?;
-    event_loop.set_control_flow(ControlFlow::Poll);
 
     // Create app instance with config
     let config = app::ViewerConfig {
@@ -171,10 +170,8 @@ fn main() -> Result<()> {
     };
     let mut app = app::App::with_config(config);
 
-    // Run event loop
-    event_loop.run(move |event, target| {
-        app.handle_event(event, target);
-    })?;
+    // Run event loop (winit 0.30 style)
+    event_loop.run_app(&mut app)?;
 
     Ok(())
 }

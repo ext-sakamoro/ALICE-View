@@ -215,7 +215,7 @@ impl Ui {
         raw_input: egui::RawInput,
     ) -> FullOutput {
         // Begin egui frame with accumulated input events
-        ctx.begin_frame(raw_input);
+        ctx.begin_pass(raw_input);
 
         // 1. Top Menu Bar
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
@@ -427,7 +427,7 @@ impl Ui {
         }
 
         // End frame and return output
-        ctx.end_frame()
+        ctx.end_pass()
     }
 }
 

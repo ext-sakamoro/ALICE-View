@@ -1,4 +1,4 @@
-//! Main application state and event handling (winit 0.29 compat)
+//! Main application state and event handling (winit 0.30)
 
 use crate::decoder::Decoder;
 use crate::renderer::Renderer;
@@ -6,9 +6,10 @@ use crate::ui::Ui;
 use glam::Vec3;
 use std::sync::Arc;
 use winit::{
+    application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{ElementState, Event, KeyEvent, WindowEvent},
-    event_loop::EventLoopWindowTarget,
+    event::{ElementState, KeyEvent, WindowEvent},
+    event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
@@ -455,18 +456,15 @@ impl App {
     /// # Panics
     ///
     /// Panics if the OS window cannot be created or if no suitable GPU adapter is found.
-    pub fn init(&mut self, target: &EventLoopWindowTarget<()>) {
+    pub fn init(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
         }
 
-        let window = Arc::new(
-            winit::window::WindowBuilder::new()
-                .with_title(&self.config.title)
-                .with_inner_size(PhysicalSize::new(self.config.width, self.config.height))
-                .build(target)
-                .unwrap(),
-        );
+        let attrs = Window::default_attributes()
+            .with_title(&self.config.title)
+            .with_inner_size(PhysicalSize::new(self.config.width, self.config.height));
+        let window = Arc::new(event_loop.create_window(attrs).unwrap());
 
         // Initialize renderer
         self.renderer = Some(
@@ -638,158 +636,154 @@ impl App {
             .is_some_and(|r| r.egui_ctx().wants_keyboard_input())
     }
 
-    /// Main event handling logic (winit 0.29 style)
-    ///
+}
+
+impl ApplicationHandler<()> for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        self.init(event_loop);
+    }
+
     /// # Panics
     ///
     /// Panics if the renderer has not been initialised before a render request arrives.
-    pub fn handle_event(&mut self, event: Event<()>, target: &EventLoopWindowTarget<()>) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
         // Forward window events to egui for input processing
-        if let (
-            Some(renderer),
-            Event::WindowEvent {
-                event: ref w_event, ..
-            },
-        ) = (&mut self.renderer, &event)
-        {
-            let response = renderer.on_window_event(w_event);
+        if let Some(renderer) = &mut self.renderer {
+            let response = renderer.on_window_event(&event);
             if response.consumed {
-                if response.repaint {
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
-                    }
+                if let Some(window) = &self.window {
+                    window.request_redraw();
                 }
                 return;
             }
         }
 
         match event {
-            Event::Resumed => {
-                self.init(target);
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) => {
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.resize(size);
+                }
             }
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested => target.exit(),
-                WindowEvent::Resized(size) => {
-                    if let Some(renderer) = &mut self.renderer {
-                        renderer.resize(size);
-                    }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(key),
+                        state: key_state,
+                        ..
+                    },
+                ..
+            } => {
+                // Only process camera/app keys if egui doesn't want keyboard
+                if !self.egui_wants_keyboard() {
+                    self.handle_key(key, key_state == ElementState::Pressed);
                 }
-                WindowEvent::KeyboardInput {
-                    event:
-                        KeyEvent {
-                            physical_key: PhysicalKey::Code(key),
-                            state: key_state,
-                            ..
-                        },
-                    ..
-                } => {
-                    // Only process camera/app keys if egui doesn't want keyboard
-                    if !self.egui_wants_keyboard() {
-                        self.handle_key(key, key_state == ElementState::Pressed);
-                    }
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
-                    }
+                if let Some(window) = &self.window {
+                    window.request_redraw();
                 }
-                WindowEvent::MouseWheel { delta, .. } => {
-                    // Only process scroll for camera if egui doesn't want pointer
-                    if !self.egui_wants_pointer() {
-                        let scroll = match delta {
-                            winit::event::MouseScrollDelta::LineDelta(_, y) => y,
-                            winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 / 100.0,
-                        };
-                        self.handle_scroll(scroll);
-                    }
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
-                    }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                // Only process scroll for camera if egui doesn't want pointer
+                if !self.egui_wants_pointer() {
+                    let scroll = match delta {
+                        winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                        winit::event::MouseScrollDelta::PixelDelta(pos) => pos.y as f32 / 100.0,
+                    };
+                    self.handle_scroll(scroll);
                 }
-                // Mouse button press/release
-                WindowEvent::MouseInput {
-                    state: btn_state,
-                    button: winit::event::MouseButton::Left,
-                    ..
-                } => {
-                    if self.egui_wants_pointer() {
-                        // egui is handling this click; release camera drag
-                        self.mouse_pressed = false;
-                    } else {
-                        self.mouse_pressed = btn_state == ElementState::Pressed;
-                    }
+                if let Some(window) = &self.window {
+                    window.request_redraw();
                 }
-                // Mouse movement (drag to pan/orbit)
-                WindowEvent::CursorMoved { position, .. } => {
-                    if self.mouse_pressed && !self.egui_wants_pointer() {
-                        if let Some(last_pos) = self.last_mouse_pos {
-                            let dx = (position.x - last_pos.x) as f32;
-                            let dy = (position.y - last_pos.y) as f32;
+            }
+            // Mouse button press/release
+            WindowEvent::MouseInput {
+                state: btn_state,
+                button: winit::event::MouseButton::Left,
+                ..
+            } => {
+                if self.egui_wants_pointer() {
+                    // egui is handling this click; release camera drag
+                    self.mouse_pressed = false;
+                } else {
+                    self.mouse_pressed = btn_state == ElementState::Pressed;
+                }
+            }
+            // Mouse movement (drag to pan/orbit)
+            WindowEvent::CursorMoved { position, .. } => {
+                if self.mouse_pressed && !self.egui_wants_pointer() {
+                    if let Some(last_pos) = self.last_mouse_pos {
+                        let dx = (position.x - last_pos.x) as f32;
+                        let dy = (position.y - last_pos.y) as f32;
 
-                            match self.state.render_mode {
-                                RenderMode::Procedural2D => {
-                                    let sensitivity = 0.002 / self.state.zoom;
-                                    self.state.pan[0] -= dx * sensitivity;
-                                    self.state.pan[1] += dy * sensitivity;
-                                }
-                                RenderMode::Sdf3D => {
-                                    let orbit_sensitivity = 0.01;
-                                    self.state
-                                        .camera
-                                        .orbit(-dx * orbit_sensitivity, dy * orbit_sensitivity);
-                                }
+                        match self.state.render_mode {
+                            RenderMode::Procedural2D => {
+                                let sensitivity = 0.002 / self.state.zoom;
+                                self.state.pan[0] -= dx * sensitivity;
+                                self.state.pan[1] += dy * sensitivity;
                             }
-
-                            if let Some(window) = &self.window {
-                                window.request_redraw();
-                            }
-                        }
-                    }
-                    self.last_mouse_pos = Some(position);
-                }
-                WindowEvent::DroppedFile(path) => {
-                    let path_str = path.to_string_lossy().to_string();
-                    tracing::info!("File dropped: {}", path_str);
-                    self.ui.queue_file(path_str);
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
-                    }
-                }
-                WindowEvent::RedrawRequested => {
-                    if self.window.is_some() && self.renderer.is_some() {
-                        self.ui.update(&mut self.state, &mut self.decoder);
-
-                        let renderer = self
-                            .renderer
-                            .as_mut()
-                            .expect("renderer must be initialized before draw");
-
-                        // Check for pending WGSL shader from loaded .asdf file
-                        if let Some(wgsl) = self.ui.take_pending_wgsl() {
-                            renderer.rebuild_sdf_pipeline_with_wgsl(&wgsl);
-                        }
-
-                        if let Err(e) =
-                            renderer.render(&mut self.state, &self.decoder, &mut self.ui)
-                        {
-                            tracing::error!("Render error: {}", e);
-                        }
-
-                        // Handle screenshot after render
-                        if self.state.screenshot_requested {
-                            self.state.screenshot_requested = false;
-                            if let Err(e) = renderer.capture_screenshot() {
-                                tracing::error!("Screenshot failed: {}", e);
+                            RenderMode::Sdf3D => {
+                                let orbit_sensitivity = 0.01;
+                                self.state
+                                    .camera
+                                    .orbit(-dx * orbit_sensitivity, dy * orbit_sensitivity);
                             }
                         }
 
-                        if !self.state.paused {
-                            if let Some(window) = &self.window {
-                                window.request_redraw();
-                            }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
                         }
                     }
                 }
-                _ => {}
-            },
+                self.last_mouse_pos = Some(position);
+            }
+            WindowEvent::DroppedFile(path) => {
+                let path_str = path.to_string_lossy().to_string();
+                tracing::info!("File dropped: {}", path_str);
+                self.ui.queue_file(path_str);
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                if self.window.is_some() && self.renderer.is_some() {
+                    self.ui.update(&mut self.state, &mut self.decoder);
+
+                    let renderer = self
+                        .renderer
+                        .as_mut()
+                        .expect("renderer must be initialized before draw");
+
+                    // Check for pending WGSL shader from loaded .asdf file
+                    if let Some(wgsl) = self.ui.take_pending_wgsl() {
+                        renderer.rebuild_sdf_pipeline_with_wgsl(&wgsl);
+                    }
+
+                    if let Err(e) =
+                        renderer.render(&mut self.state, &self.decoder, &mut self.ui)
+                    {
+                        tracing::error!("Render error: {}", e);
+                    }
+
+                    // Handle screenshot after render
+                    if self.state.screenshot_requested {
+                        self.state.screenshot_requested = false;
+                        if let Err(e) = renderer.capture_screenshot() {
+                            tracing::error!("Screenshot failed: {}", e);
+                        }
+                    }
+
+                    if !self.state.paused {
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }

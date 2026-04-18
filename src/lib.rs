@@ -93,7 +93,7 @@ pub mod renderer;
 pub mod ui;
 
 use anyhow::Result;
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::EventLoop;
 
 // Re-export key types
 pub use app::{App, FrameStats, ViewerConfig, ViewerState, XRayType};
@@ -119,15 +119,12 @@ pub use perf::{FrameTimer, PerfCounter, PerfStats};
 pub fn launch_viewer(config: ViewerConfig) -> Result<()> {
     // Create event loop
     let event_loop = EventLoop::new()?;
-    event_loop.set_control_flow(ControlFlow::Poll);
 
     // Create app with config
     let mut app = App::with_config(config);
 
-    // Run event loop (winit 0.29 style)
-    event_loop.run(move |event, target| {
-        app.handle_event(event, target);
-    })?;
+    // Run event loop (winit 0.30 style)
+    event_loop.run_app(&mut app)?;
 
     Ok(())
 }

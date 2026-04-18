@@ -16,12 +16,12 @@ use image::RgbaImage;
 use std::sync::Arc;
 use wgpu::{
     Backends, BufferDescriptor, BufferUsages, Color, CommandEncoderDescriptor, Device,
-    DeviceDescriptor, Extent3d, Features, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout,
-    Instance, InstanceDescriptor, Limits, LoadOp, Maintain, MapMode, Operations, Origin3d,
-    PowerPreference, PresentMode, Queue, RenderPassColorAttachment, RenderPassDescriptor,
-    RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, SurfaceError, TextureAspect,
-    TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor,
-    COPY_BYTES_PER_ROW_ALIGNMENT,
+    DeviceDescriptor, Extent3d, Features, Instance, InstanceDescriptor, Limits, LoadOp, Maintain,
+    MapMode, Operations, Origin3d, PowerPreference, PresentMode, Queue,
+    RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface,
+    SurfaceConfiguration, SurfaceError, TexelCopyBufferInfo, TexelCopyBufferLayout,
+    TexelCopyTextureInfo, TextureAspect, TextureDescriptor, TextureDimension, TextureUsages,
+    TextureViewDescriptor, COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
@@ -54,7 +54,7 @@ impl Renderer {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
 
-        let instance = Instance::new(InstanceDescriptor {
+        let instance = Instance::new(&InstanceDescriptor {
             backends: Backends::all(),
             ..Default::default()
         });
@@ -78,6 +78,7 @@ impl Renderer {
                     label: Some("ALICE-View Device"),
                     required_features: Features::empty(),
                     required_limits: Limits::default(),
+                    memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
             )
@@ -115,8 +116,8 @@ impl Renderer {
 
         let egui_ctx = egui::Context::default();
         let viewport_id = egui_ctx.viewport_id();
-        let egui_state = egui_winit::State::new(egui_ctx.clone(), viewport_id, &window, None, None);
-        let egui_renderer = egui_wgpu::Renderer::new(&device, surface_format, None, 1);
+        let egui_state = egui_winit::State::new(egui_ctx.clone(), viewport_id, &window, None, None, None);
+        let egui_renderer = egui_wgpu::Renderer::new(&device, surface_format, None, 1, false);
 
         Ok(Self {
             surface,
@@ -217,15 +218,15 @@ impl Renderer {
             });
 
         encoder.copy_texture_to_buffer(
-            ImageCopyTexture {
+            TexelCopyTextureInfo {
                 texture: &output.texture,
                 mip_level: 0,
                 origin: Origin3d::ZERO,
                 aspect: TextureAspect::All,
             },
-            ImageCopyBuffer {
+            TexelCopyBufferInfo {
                 buffer: &buffer,
-                layout: ImageDataLayout {
+                layout: TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(padded_bytes_per_row),
                     rows_per_image: Some(height),
@@ -379,7 +380,7 @@ impl Renderer {
                 .update_texture(&self.device, &self.queue, *id, image_delta);
         }
 
-        self.egui_renderer.update_buffers(
+        let extra_cmds = self.egui_renderer.update_buffers(
             &self.device,
             &self.queue,
             &mut encoder,
@@ -388,20 +389,23 @@ impl Renderer {
         );
 
         {
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("egui Render Pass"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Load,
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+            // egui-wgpu 0.31 requires RenderPass<'static>; forget_lifetime() achieves this.
+            let mut render_pass = encoder
+                .begin_render_pass(&RenderPassDescriptor {
+                    label: Some("egui Render Pass"),
+                    color_attachments: &[Some(RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: Operations {
+                            load: LoadOp::Load,
+                            store: StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                })
+                .forget_lifetime();
 
             self.egui_renderer
                 .render(&mut render_pass, &clipped_primitives, &screen_descriptor);
@@ -415,7 +419,12 @@ impl Renderer {
         self.egui_state
             .handle_platform_output(&self.window, platform_output);
 
-        self.queue.submit(std::iter::once(encoder.finish()));
+        // Submit extra command buffers from egui paint callbacks first, then main encoder
+        self.queue.submit(
+            extra_cmds
+                .into_iter()
+                .chain(std::iter::once(encoder.finish())),
+        );
         output.present();
 
         Ok(())
