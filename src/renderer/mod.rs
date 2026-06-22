@@ -17,11 +17,11 @@ use std::sync::Arc;
 use wgpu::{
     Backends, BufferDescriptor, BufferUsages, Color, CommandEncoderDescriptor, Device,
     DeviceDescriptor, Extent3d, Features, Instance, InstanceDescriptor, Limits, LoadOp, Maintain,
-    MapMode, Operations, Origin3d, PowerPreference, PresentMode, Queue,
-    RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface,
-    SurfaceConfiguration, SurfaceError, TexelCopyBufferInfo, TexelCopyBufferLayout,
-    TexelCopyTextureInfo, TextureAspect, TextureDescriptor, TextureDimension, TextureUsages,
-    TextureViewDescriptor, COPY_BYTES_PER_ROW_ALIGNMENT,
+    MapMode, Operations, Origin3d, PowerPreference, PresentMode, Queue, RenderPassColorAttachment,
+    RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration,
+    SurfaceError, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect,
+    TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor,
+    COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window};
 
@@ -116,7 +116,8 @@ impl Renderer {
 
         let egui_ctx = egui::Context::default();
         let viewport_id = egui_ctx.viewport_id();
-        let egui_state = egui_winit::State::new(egui_ctx.clone(), viewport_id, &window, None, None, None);
+        let egui_state =
+            egui_winit::State::new(egui_ctx.clone(), viewport_id, &window, None, None, None);
         let egui_renderer = egui_wgpu::Renderer::new(&device, surface_format, None, 1, false);
 
         Ok(Self {

@@ -635,7 +635,6 @@ impl App {
             .as_ref()
             .is_some_and(|r| r.egui_ctx().wants_keyboard_input())
     }
-
 }
 
 impl ApplicationHandler<()> for App {
@@ -763,9 +762,7 @@ impl ApplicationHandler<()> for App {
                         renderer.rebuild_sdf_pipeline_with_wgsl(&wgsl);
                     }
 
-                    if let Err(e) =
-                        renderer.render(&mut self.state, &self.decoder, &mut self.ui)
-                    {
+                    if let Err(e) = renderer.render(&mut self.state, &self.decoder, &mut self.ui) {
                         tracing::error!("Render error: {}", e);
                     }
 
