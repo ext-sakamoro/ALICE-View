@@ -23,7 +23,12 @@ db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 version = 2
 yanked = "deny"
-ignore = []
+ignore = [
+    # ttf-parser unmaintained (epaint/egui transitive、font 描画に必須)
+    "RUSTSEC-2025-0086",
+    # paste unmaintained (pyo3-macros / bytemuck 等 transitive)
+    "RUSTSEC-2024-0436",
+]
 
 # ---------------------------------------------------------------------------
 # Licenses (allow-list 方式)
@@ -46,6 +51,11 @@ allow = [
     "BSL-1.0",
     "MPL-2.0",
     "OpenSSL",
+    # Font-related licenses (epaint_default_fonts / egui 経由)
+    "OFL-1.1",           # SIL Open Font License (Ubuntu Mono / Noto 等)
+    "Ubuntu-font-1.0",   # Ubuntu Font License
+    # LLVM ecosystem
+    "NCSA",              # libfuzzer-sys / LLVM related
 ]
 
 [[licenses.clarify]]
