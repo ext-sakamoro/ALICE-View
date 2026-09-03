@@ -18,16 +18,16 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: ALICE-View
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ext-sakamoro/ALICE-SDF
           path: ALICE-SDF
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: ext-sakamoro/ALICE-LOL
           path: ALICE-LOL
@@ -98,7 +98,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -112,7 +112,7 @@ jobs:
     name: actionlint (workflow YAML 検証)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
         with:

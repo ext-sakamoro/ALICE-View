@@ -1,0 +1,106 @@
+name: 'ALICE-View Optional Bridge Stubs'
+description: |
+  Create empty stub crates for the ALICE-View sibling path deps
+  (alice-sdf / alice-lol / alice-analytics / alice-physics / alice-db).
+  alice-sdf は mandatory (gpu feature 有効化前提)、その他 4 crate は
+  optional feature (lol / analytics / physics / db)。
+
+  Canonical CI template: [[reference_alice_ci_canonical_template]]
+
+  license = "MIT OR Apache-2.0" 必須 (canonical 罠 #2、cargo-deny "unlicensed" reject 予防)
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+
+        # ALICE-SDF stub (mandatory dep、`gpu` feature 有効化前提)
+        mkdir -p "../ALICE-SDF/src"
+        cat > "../ALICE-SDF/Cargo.toml" <<'TOML'
+        [package]
+        name = "alice-sdf"
+        version = "1.7.4"
+        edition = "2021"
+        license = "MIT OR Apache-2.0"
+
+        [features]
+        default = ["gpu"]
+        glsl = []
+        gpu = []
+        hlsl = []
+        physics = []
+
+        [lib]
+        path = "src/lib.rs"
+        TOML
+        : > "../ALICE-SDF/src/lib.rs"
+
+        # ALICE-LOL stub (default feature `lol`、実 crate は AGPL-3.0)
+        # stub は CI 内 fake、実 license は反映しない (permissive で cargo-deny 通過)
+        # alice-lol は workspace 内 alice-lol/ subdir の crate
+        mkdir -p "../ALICE-LOL/alice-lol/src"
+        cat > "../ALICE-LOL/alice-lol/Cargo.toml" <<'TOML'
+        [package]
+        name = "alice-lol"
+        version = "0.4.0"
+        edition = "2021"
+        license = "MIT OR Apache-2.0"
+
+        [lib]
+        path = "src/lib.rs"
+        TOML
+        : > "../ALICE-LOL/alice-lol/src/lib.rs"
+
+        # ALICE-Analytics stub (analytics feature 用、`std` default)
+        mkdir -p "../ALICE-Analytics/src"
+        cat > "../ALICE-Analytics/Cargo.toml" <<'TOML'
+        [package]
+        name = "alice-analytics"
+        version = "0.1.0"
+        edition = "2021"
+        license = "MIT OR Apache-2.0"
+
+        [features]
+        default = ["std"]
+        std = []
+
+        [lib]
+        path = "src/lib.rs"
+        TOML
+        : > "../ALICE-Analytics/src/lib.rs"
+
+        # ALICE-Physics stub (physics feature 用、実 crate は AGPL-3.0)
+        mkdir -p "../ALICE-Physics/src"
+        cat > "../ALICE-Physics/Cargo.toml" <<'TOML'
+        [package]
+        name = "alice-physics"
+        version = "0.12.0"
+        edition = "2021"
+        license = "MIT OR Apache-2.0"
+
+        [features]
+        default = ["std"]
+        std = []
+
+        [lib]
+        path = "src/lib.rs"
+        TOML
+        : > "../ALICE-Physics/src/lib.rs"
+
+        # ALICE-DB stub (db feature 用)
+        mkdir -p "../ALICE-DB/src"
+        cat > "../ALICE-DB/Cargo.toml" <<'TOML'
+        [package]
+        name = "alice-db"
+        version = "0.1.0"
+        edition = "2021"
+        license = "MIT OR Apache-2.0"
+
+        [lib]
+        path = "src/lib.rs"
+        TOML
+        : > "../ALICE-DB/src/lib.rs"
+
+        echo "Created stubs: alice-sdf / alice-lol / alice-analytics / alice-physics / alice-db (all with license = MIT OR Apache-2.0)"

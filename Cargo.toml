@@ -65,6 +65,21 @@ analytics = ["dep:alice-analytics"]  # Rendering performance metrics (DDSketch)
 physics = ["dep:alice-physics"]      # Interactive physics visualization
 db = ["dep:alice-db"]                # Time-series DB query → plot data
 
+# cargo-machete false-positive 予防
+# (canonical CI template [[reference_alice_ci_canonical_template]] 罠 #3)
+[package.metadata.cargo-machete]
+ignored = [
+    # noise: 実 procedural noise 生成は wgpu shader (.wgsl) 側で完結
+    # Rust 側は文書内の参照のみだが future decoder path で復活予定 (delete しない)
+    "noise",
+    # serde: derive(Serialize/Deserialize) macros は現状 direct use なし
+    # ただし ViewerConfig 等の JSON i/o path で有効化予定 (Cargo.toml で
+    # features = ["derive"] を明示、間接使用)
+    "serde",
+    # thiserror: 現状 anyhow で統一しているが、library error 分離時に復活予定
+    "thiserror",
+]
+
 [profile.release]
 opt-level = 3
 lto = "fat"

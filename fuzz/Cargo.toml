@@ -1,0 +1,41 @@
+[package]
+name = "alice-view-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.alice-view]
+path = ".."
+default-features = false
+
+# cargo-machete false-positive 予防 (canonical [[reference_alice_ci_canonical_template]] 罠 #3)
+# libfuzzer-sys は fuzz_target! macro 内でのみ参照されるため machete が誤検知
+[package.metadata.cargo-machete]
+ignored = ["libfuzzer-sys"]
+
+# 攻撃者制御 .alice file 全体の parse で panic ゼロ + OOM 予防
+[[bin]]
+name = "fuzz_alice_decode"
+path = "fuzz_targets/fuzz_alice_decode.rs"
+doc = false
+
+# 攻撃者制御 .alice header 単体の parse (24-byte header) で panic ゼロ
+[[bin]]
+name = "fuzz_alice_header"
+path = "fuzz_targets/fuzz_alice_header.rs"
+doc = false
+
+# 攻撃者制御 .alice metadata (JSON tail) の parse で panic ゼロ + serde_json crash 予防
+[[bin]]
+name = "fuzz_alice_metadata"
+path = "fuzz_targets/fuzz_alice_metadata.rs"
+doc = false
+
+[workspace]
+members = ["."]
