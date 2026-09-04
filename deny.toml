@@ -24,8 +24,9 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 version = 2
 yanked = "deny"
 ignore = [
-    # ttf-parser unmaintained (epaint/egui transitive、font 描画に必須)
-    "RUSTSEC-2025-0086",
+    # ttf-parser unmaintained (RUSTSEC-2026-0192、epaint/egui transitive、font 描画に必須)
+    # 代替 skrifa (Google fontations) 移行は upstream egui/wgpu の判断待ち
+    "RUSTSEC-2026-0192",
     # paste unmaintained (pyo3-macros / bytemuck 等 transitive)
     "RUSTSEC-2024-0436",
 ]
