@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload crash artifacts (if any)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: fuzz-crash-${{ matrix.target }}
           path: fuzz/artifacts/${{ matrix.target }}
