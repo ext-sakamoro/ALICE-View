@@ -42,19 +42,30 @@ jobs:
       - name: Create dependency stubs
         shell: bash
         run: |
-          # SDF optional deps
+          # 3 つ目の field は stub の version
+          #
+          # Cargo.toml の path dep に `version` を書いた crate は、この stub の
+          # version がその要求を満たしていないと resolve 段階で CI が落ちる
+          # (optional dep も lock には載るので、feature を有効化していなくても
+          #  version は解決される) Cargo.toml 側の要求を動かしたら、ここと
+          # .github/actions/alice-stubs/action.yml の両方を同 commit で追従させる
+          #
+          # alice-codec / libasp / alice-cache は alice-sdf 4.0.0 が registry dep
+          # (`version` のみ、path なし) に切り替えたので現状この stub は参照されない
+          # path dep に戻した時に silent に壊れないよう残してある
           for crate_info in \
-            "ALICE-Physics:alice-physics" \
-            "ALICE-Codec:alice-codec" \
-            "ALICE-Streaming-Protocol:libasp" \
-            "ALICE-Cache:alice-cache"; do
+            "ALICE-Physics:alice-physics:1.4.0" \
+            "ALICE-Codec:alice-codec:0.1.0" \
+            "ALICE-Streaming-Protocol:libasp:0.1.0" \
+            "ALICE-Cache:alice-cache:0.1.0"; do
             dir=$(echo "$crate_info" | cut -d: -f1)
             pkg=$(echo "$crate_info" | cut -d: -f2)
+            ver=$(echo "$crate_info" | cut -d: -f3)
             mkdir -p "$dir/src"
             cat > "$dir/Cargo.toml" << TOML
           [package]
           name = "$pkg"
-          version = "0.1.0"
+          version = "$ver"
           edition = "2021"
           [lib]
           path = "src/lib.rs"
@@ -67,15 +78,16 @@ jobs:
 
           # View optional deps
           for crate_info in \
-            "ALICE-Analytics:alice-analytics" \
-            "ALICE-DB:alice-db"; do
+            "ALICE-Analytics:alice-analytics:0.1.1" \
+            "ALICE-DB:alice-db:0.2.0-beta.3"; do
             dir=$(echo "$crate_info" | cut -d: -f1)
             pkg=$(echo "$crate_info" | cut -d: -f2)
+            ver=$(echo "$crate_info" | cut -d: -f3)
             mkdir -p "$dir/src"
             cat > "$dir/Cargo.toml" << TOML
           [package]
           name = "$pkg"
-          version = "0.1.0"
+          version = "$ver"
           edition = "2021"
           [lib]
           path = "src/lib.rs"

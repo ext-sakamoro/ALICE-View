@@ -9,6 +9,12 @@ description: |
 
   license = "MIT OR Apache-2.0" 必須 (canonical 罠 #2、cargo-deny "unlicensed" reject 予防)
 
+  ⚠️ version は Cargo.toml の path dep が要求する range を満たすこと
+  path dep に `version` を書いた crate では、stub の version が要求を外すと
+  resolve 段階で落ちる (optional dep も lock に載るので feature 無効でも解決される)
+  Cargo.toml 側の要求を動かしたら、ここと .github/workflows/ci.yml の stub 生成
+  step の両方を同 commit で追従させる
+
 runs:
   using: composite
   steps:
@@ -21,7 +27,7 @@ runs:
         cat > "../ALICE-SDF/Cargo.toml" <<'TOML'
         [package]
         name = "alice-sdf"
-        version = "1.7.4"
+        version = "4.0.0"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 
@@ -58,7 +64,7 @@ runs:
         cat > "../ALICE-Analytics/Cargo.toml" <<'TOML'
         [package]
         name = "alice-analytics"
-        version = "0.1.0"
+        version = "0.1.1"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 
@@ -76,7 +82,7 @@ runs:
         cat > "../ALICE-Physics/Cargo.toml" <<'TOML'
         [package]
         name = "alice-physics"
-        version = "0.12.0"
+        version = "1.4.0"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 
@@ -94,7 +100,7 @@ runs:
         cat > "../ALICE-DB/Cargo.toml" <<'TOML'
         [package]
         name = "alice-db"
-        version = "0.1.0"
+        version = "0.2.0-beta.3"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 
