@@ -2,6 +2,12 @@
 
 All notable changes to ALICE-View are documented here.
 
+## [Unreleased]
+
+### Fixed
+- path dep 5 個 (`alice-sdf` / `alice-lol` / `alice-analytics` / `alice-physics` / `alice-db`) に `version` を明記 `path` だけだと `cargo package` が `all dependencies must have a version requirement specified when packaging` で落ちて publish できない publish 時は `path` が外れて version 要求だけが残るので、値は相手の実 version に合わせた 通常の local build は `path` 優先のまま変わらない なお本 crate の publish は依然として不可 — `alice-sdf 4.0.0` / `alice-lol 0.4.0` が crates.io 未公開 (それぞれ 3.1.0 / 0.3.0 まで) で `cargo package` が解決に失敗する (cargo 1.98.1 は packaging 時に path dep の実在を crates.io に対して検証する) そのため `package-integrity` job は入れていない (恒久 red を置かない)
+- `.cargo/config.toml` の comment が local opt-in 手段として案内していた `.cargo/config.local.toml` は cargo が自動では読まない (2026-09-29 実測、置いても無言で無視される) 実際に効く `RUSTFLAGS="-C target-cpu=native" cargo bench` と `cargo bench --config 'build.rustflags=["-C","target-cpu=native"]'` の 2 経路に差し替え `target-cpu=native` を置かない方針そのものは commit 2233dc0 から変更なし (ALICE-LLM / ALICE-Text と文面を揃えた)
+
 ## [0.3.0] — 2026-02-28
 
 ### Added

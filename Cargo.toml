@@ -30,10 +30,14 @@ glam = { version = "0.29", features = ["bytemuck", "serde"] }
 noise = "0.9"
 
 # ALICE-SDF Integration (3D raymarching with WGSL transpiler)
-alice-sdf = { path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
+#
+# path dep の `version` は publish に必須 (path だけだと `cargo package` が
+# "all dependencies must have a version requirement specified when packaging" で落ちる)
+# publish 時は `path` が外れて version 要求だけが残るので、値は相手の実 version に合わせる
+alice-sdf = { version = "4.0", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
 
 # ALICE-LOL Integration (LOL DSL runtime parser)
-alice-lol = { path = "../ALICE-LOL/alice-lol", optional = true }
+alice-lol = { version = "0.4", path = "../ALICE-LOL/alice-lol", optional = true }
 
 # Logging
 log = "0.4"
@@ -54,9 +58,9 @@ chrono = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
 # ALICE ecosystem bridges (optional)
-alice-analytics = { path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
-alice-physics = { path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
-alice-db = { path = "../ALICE-DB", optional = true, default-features = false }
+alice-analytics = { version = "0.1.1", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
+alice-physics = { version = "1.4", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
+alice-db = { version = "0.2.0-beta.3", path = "../ALICE-DB", optional = true, default-features = false }
 
 [features]
 default = ["lol"]
