@@ -29,6 +29,12 @@ ignore = [
     "RUSTSEC-2026-0192",
     # paste unmaintained (pyo3-macros / bytemuck 等 transitive)
     "RUSTSEC-2024-0436",
+    # bincode unmaintained (alice-sdf 経由、.asdf の wire format 互換のため据置)
+    # ⚠️ patched = [] なので **どの version に上げても消えない** 上流の ALICE-SDF が
+    # 同じ理由で既に ignore しており (deny.toml:26)、ALICE-* 50 repo 中 31 repo が同様
+    # ここに無いのは ALICE-View 側の entry 漏れだった 代替 (postcard / bitcode) への
+    # 移行は wire format が変わるので ALICE-SDF 側の判断
+    "RUSTSEC-2025-0141",
 ]
 
 # ---------------------------------------------------------------------------
