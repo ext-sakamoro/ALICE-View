@@ -35,6 +35,13 @@ ignore = [
     # ここに無いのは ALICE-View 側の entry 漏れだった 代替 (postcard / bitcode) への
     # 移行は wire format が変わるので ALICE-SDF 側の判断
     "RUSTSEC-2025-0141",
+    # rkyv 0.7 の Rc/Arc archive validation OOB (alice-db 経由、db feature 時のみ)
+    # 脆弱性は **archive された型が Rc/Arc を含む**場合に成立する alice-db の
+    # rkyv derive 型は SegmentMetadata / DataSegment / ModelType の 3 つで、field は
+    # primitive と Vec / Option<Vec> のみ = 非該当 (2026-09-29 に定義を読んで確認)
+    # ⚠️ 0.7 系は upstream 非サポートなので、恒久対応は alice-db の rkyv 0.8 移行
+    # (0.7 -> 0.8 は API 破壊、別 repo の作業) 上流 ALICE-DB も同じ理由で ignore 済
+    "RUSTSEC-2026-0235",
 ]
 
 # ---------------------------------------------------------------------------
@@ -64,6 +71,19 @@ allow = [
     # LLVM ecosystem
     "NCSA",              # libfuzzer-sys / LLVM related
 ]
+
+# optional な ALICE sibling は `AGPL-3.0-or-later OR LicenseRef-Commercial` の
+# デュアルで、allow-list 方式では両辺とも通らない (canonical 罠 #7)
+# ⚠️ これは **gate を通すための exception であって、伝播を解消するものではない**
+# ALICE-View 自身は permissive 宣言なので、`db` / `physics` feature を有効にした
+# 配布物は AGPL 側の条件を負う README への明示は別途 Backlog (対応 C) にある
+[[licenses.exceptions]]
+name = "alice-db"
+allow = ["AGPL-3.0-or-later"]
+
+[[licenses.exceptions]]
+name = "alice-physics"
+allow = ["AGPL-3.0-or-later"]
 
 [[licenses.clarify]]
 name = "ring"
