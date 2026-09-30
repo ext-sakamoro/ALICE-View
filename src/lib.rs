@@ -91,6 +91,8 @@ pub mod perf;
 pub mod physics_bridge;
 pub mod renderer;
 pub mod ui;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 
 use anyhow::Result;
 use winit::event_loop::EventLoop;
