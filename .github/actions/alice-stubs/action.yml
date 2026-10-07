@@ -27,7 +27,7 @@ runs:
         cat > "../ALICE-SDF/Cargo.toml" <<'TOML'
         [package]
         name = "alice-sdf"
-        version = "4.0.0"
+        version = "5.0.0"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 

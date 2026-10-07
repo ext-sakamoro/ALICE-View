@@ -34,7 +34,7 @@ noise = "0.9"
 # path dep の `version` は publish に必須 (path だけだと `cargo package` が
 # "all dependencies must have a version requirement specified when packaging" で落ちる)
 # publish 時は `path` が外れて version 要求だけが残るので、値は相手の実 version に合わせる
-alice-sdf = { version = "4.0", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
+alice-sdf = { version = "5.0", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
 
 # ALICE-LOL Integration (LOL DSL runtime parser)
 alice-lol = { version = "0.4", path = "../ALICE-LOL/alice-lol", optional = true }
