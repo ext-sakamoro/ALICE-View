@@ -1,6 +1,6 @@
 name: Security & Hygiene
 
-# canonical CI template: [[reference_alice_ci_canonical_template]]
+# canonical CI template
 # ALICE-SDF v1.7.7 (commit 52d26f9) を base に ALICE-View 用に調整
 #
 # 目的:
@@ -76,7 +76,7 @@ jobs:
 
       # EmbarkStudios/cargo-deny-action@v2 は Docker container 内で稼働し、
       # /github/workspace のみ mount するため sibling path dep が見えず fail する
-      # 直接 install で回避 (canonical [[reference_alice_ci_canonical_template]] 罠 #1)
+      # 直接 install で回避 (action 版は advisory-db の取得で失敗する事例がある)
       - name: Install cargo-deny
         run: cargo install --locked cargo-deny
 
@@ -106,7 +106,7 @@ jobs:
       - name: Detect todo! / unimplemented! / panic!(STUB) in src/**
         run: |
           set -eo pipefail
-          # STUB (uppercase) のみに絞る (canonical 罠 catalog #9-b 更新済)
+          # STUB (uppercase) のみに絞る (小文字の stub は通常語として現れる)
           # trait default method の `panic!("... not implemented by this backend")`
           # 等は legitimate な pattern で stub ではない
           hits=$(grep -rnE 'todo!\(|unimplemented!\(|panic!\([^)]*STUB' \

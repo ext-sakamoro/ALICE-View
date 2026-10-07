@@ -7,7 +7,7 @@
 //!
 //! JSON payload は攻撃者制御 file の最内層で最も攻撃面が広い
 //!
-//! canonical CI template [[reference_alice_ci_canonical_template]] 準拠
+//! 他の crate と同じ fuzz target 構成に揃えている
 
 #![no_main]
 

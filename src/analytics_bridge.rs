@@ -3,7 +3,10 @@
 //! Rendering performance metrics collection using probabilistic data structures.
 //! Tracks frame times, draw calls, GPU memory usage with DDSketch quantiles.
 
-use alice_analytics::prelude::*;
+// The crate has no `prelude`; it was removed when the module layout was
+// reorganised, so the types are imported from the modules that define them
+use alice_analytics::anomaly::MadDetector;
+use alice_analytics::sketch::{CountMinSketch, DDSketch, HyperLogLog};
 
 /// Rendering performance metrics collector.
 pub struct RenderMetrics {

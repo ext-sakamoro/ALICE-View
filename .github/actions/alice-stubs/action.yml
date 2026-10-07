@@ -5,9 +5,9 @@ description: |
   alice-sdf は mandatory (gpu feature 有効化前提)、その他 4 crate は
   optional feature (lol / analytics / physics / db)。
 
-  Canonical CI template: [[reference_alice_ci_canonical_template]]
+  Canonical CI template
 
-  license = "MIT OR Apache-2.0" 必須 (canonical 罠 #2、cargo-deny "unlicensed" reject 予防)
+  license = "MIT OR Apache-2.0" 必須 (欠落すると cargo-deny が unlicensed として reject する)
 
   ⚠️ version は Cargo.toml の path dep が要求する range を満たすこと
   path dep に `version` を書いた crate では、stub の version が要求を外すと
@@ -64,7 +64,7 @@ runs:
         cat > "../ALICE-Analytics/Cargo.toml" <<'TOML'
         [package]
         name = "alice-analytics"
-        version = "0.1.1"
+        version = "0.2.0"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 

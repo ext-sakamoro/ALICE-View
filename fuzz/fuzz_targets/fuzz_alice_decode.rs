@@ -7,7 +7,7 @@
 //!
 //! を全て `Result::Err` に落ちることを保証する
 //!
-//! canonical CI template [[reference_alice_ci_canonical_template]] 準拠
+//! 他の crate と同じ fuzz target 構成に揃えている
 
 #![no_main]
 

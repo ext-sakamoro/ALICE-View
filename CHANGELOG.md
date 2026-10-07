@@ -5,6 +5,12 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Fixed
+- `alice-analytics` の version 要求を `0.2` に追従 実 crate が 0.2.0 になったので `^0.1.1` は解決できず、`cargo metadata` が `failed to select a version for the requirement alice-analytics = "^0.1.1"` で落ちていた (feature 無効でも optional dep は lock に載るので、`analytics` を使わない build も止まる) `.github/actions/alice-stubs/action.yml` の stub version も 0.2.0 に揃えた (`ci.yml` 側は `make-stubs.py` が `Cargo.toml` から導出するので追従不要)
+- `analytics_bridge` が compile できない状態だったのを修正 `alice_analytics::prelude` を import していたが、依存 crate の module 構成が変わった際に `prelude` は無くなっていた 型自体は実在するので `anomaly::MadDetector` と `sketch::{CountMinSketch, DDSketch, HyperLogLog}` から直接 import する形にした
+- CI 設定と manifest の comment を書き直し、外部参照でなく理由そのものを書くようにした (`.github/` 5 file / `Cargo.toml` / `deny.toml` / `fuzz/` 4 file)
+
+### Added
+- CI に `cargo check --lib --features analytics` を追加し、`ALICE-Analytics` を real checkout するようにした `analytics` は optional feature なので既定 build では 1 行も compile されず、上の `prelude` 不整合はそのために見逃されていた stub は空 crate なので型を名指しする bridge には使えず、`make-stubs.py` は既に存在する sibling を飛ばすので real checkout と併用できる
 - path dep 5 個 (`alice-sdf` / `alice-lol` / `alice-analytics` / `alice-physics` / `alice-db`) に `version` を明記 `path` だけだと `cargo package` が `all dependencies must have a version requirement specified when packaging` で落ちて publish できない publish 時は `path` が外れて version 要求だけが残るので、値は相手の実 version に合わせた 通常の local build は `path` 優先のまま変わらない なお本 crate の publish は依然として不可 — `alice-sdf 4.0.0` / `alice-lol 0.4.0` が crates.io 未公開 (それぞれ 3.1.0 / 0.3.0 まで) で `cargo package` が解決に失敗する (cargo 1.98.1 は packaging 時に path dep の実在を crates.io に対して検証する) そのため `package-integrity` job は入れていない (恒久 red を置かない)
 - CI の stub 生成 2 箇所 (`.github/workflows/ci.yml` / `.github/actions/alice-stubs/action.yml`) の stub version を実 crate に追従 上の version 追加で `alice-sdf 1.7.4` / `alice-physics 0.12.0` / `alice-analytics 0.1.0` / `alice-db 0.1.0` の stub が要求を外し、CI が resolve 段階で落ちる状態だった (optional dep も lock に載るので feature 無効でも解決される) 実測で確認: stub を 0.12.0 に戻すと `failed to select a version for the requirement alice-physics = "^1.4"` で fail、1.4.0 なら `cargo build --lib` 完走
 - `.cargo/config.toml` の comment が local opt-in 手段として案内していた `.cargo/config.local.toml` は cargo が自動では読まない (2026-09-29 実測、置いても無言で無視される) 実際に効く `RUSTFLAGS="-C target-cpu=native" cargo bench` と `cargo bench --config 'build.rustflags=["-C","target-cpu=native"]'` の 2 経路に差し替え `target-cpu=native` を置かない方針そのものは commit 2233dc0 から変更なし (ALICE-LLM / ALICE-Text と文面を揃えた)

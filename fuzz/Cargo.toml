@@ -14,7 +14,7 @@ libfuzzer-sys = "0.4"
 path = ".."
 default-features = false
 
-# cargo-machete false-positive 予防 (canonical [[reference_alice_ci_canonical_template]] 罠 #3)
+# cargo-machete false-positive 予防 (fuzz target からしか使わない dep)
 # libfuzzer-sys は fuzz_target! macro 内でのみ参照されるため machete が誤検知
 [package.metadata.cargo-machete]
 ignored = ["libfuzzer-sys"]

@@ -1,12 +1,13 @@
 # cargo-deny 設定 (v0.14+ schema)
 # https://embarkstudios.github.io/cargo-deny/
 #
-# canonical CI template: [[reference_alice_ci_canonical_template]]
+# canonical CI template
 # ALICE-SDF v1.7.7 (commit 52d26f9) の deny.toml を base に ALICE-View 用に調整
 #
 # ALICE-View 自体は MIT OR Apache-2.0 (permissive) のため自己 exception 不要
 # sibling stubs (alice-sdf / alice-lol / alice-analytics / alice-physics / alice-db) は
-# alice-stubs action で "MIT OR Apache-2.0" で生成される (canonical 罠 #2 予防)
+# alice-stubs action で "MIT OR Apache-2.0" で生成される (license 欠落だと
+# cargo-deny が unlicensed として reject する)
 
 [graph]
 all-features = false
@@ -73,7 +74,7 @@ allow = [
 ]
 
 # optional な ALICE sibling は `AGPL-3.0-or-later OR LicenseRef-Commercial` の
-# デュアルで、allow-list 方式では両辺とも通らない (canonical 罠 #7)
+# デュアルで、allow-list 方式では両辺とも通らない
 # ⚠️ これは **gate を通すための exception であって、伝播を解消するものではない**
 # ALICE-View 自身は permissive 宣言なので、`db` / `physics` feature を有効にした
 # 配布物は AGPL 側の条件を負う README への明示は別途 Backlog (対応 C) にある

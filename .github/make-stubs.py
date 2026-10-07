@@ -301,7 +301,7 @@ def main() -> int:
             f'name = "{crate}"',
             f'version = "{version}"',
             'edition = "2021"',
-            # cargo-deny の unlicensed reject 予防 (canonical 罠 #2)
+            # cargo-deny の unlicensed reject 予防
             'license = "MIT OR Apache-2.0"',
             "",
             "[lib]",

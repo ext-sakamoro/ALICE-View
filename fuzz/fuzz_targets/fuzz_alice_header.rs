@@ -8,7 +8,7 @@
 //! header parse は attack surface の最外周なので、malformed input が
 //! 内部 slice 演算で panic することを完全に防ぐ必要がある
 //!
-//! canonical CI template [[reference_alice_ci_canonical_template]] 準拠
+//! 他の crate と同じ fuzz target 構成に揃えている
 
 #![no_main]
 

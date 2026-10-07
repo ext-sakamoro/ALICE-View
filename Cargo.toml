@@ -58,7 +58,7 @@ chrono = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
 # ALICE ecosystem bridges (optional)
-alice-analytics = { version = "0.1.1", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
+alice-analytics = { version = "0.2", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
 alice-physics = { version = "1.4", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
 alice-db = { version = "0.2.0-beta.3", path = "../ALICE-DB", optional = true, default-features = false }
 
@@ -70,7 +70,7 @@ physics = ["dep:alice-physics"]      # Interactive physics visualization
 db = ["dep:alice-db"]                # Time-series DB query → plot data
 
 # cargo-machete false-positive 予防
-# (canonical CI template [[reference_alice_ci_canonical_template]] 罠 #3)
+# (cargo-machete が optional dep を未使用と誤判定するのを防ぐ)
 [package.metadata.cargo-machete]
 ignored = [
     # noise: 実 procedural noise 生成は wgpu shader (.wgsl) 側で完結

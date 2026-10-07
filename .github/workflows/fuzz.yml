@@ -1,13 +1,13 @@
 name: Fuzz
 
-# canonical CI template: [[reference_alice_ci_canonical_template]]
+# canonical CI template
 # ALICE-SDF v1.7.7 (commit 52d26f9) を base に ALICE-View 用に調整
 #
 # 目的:
 # - 3 fuzz target (fuzz_alice_decode / fuzz_alice_header / fuzz_alice_metadata) を time-boxed 実行
 # - 攻撃者制御 .alice file (file / header / metadata JSON tail) で panic ゼロ + OOM 予防を検証
 #
-# 罠:
+# 注意点:
 # - cargo-fuzz は nightly toolchain 必須 (rust-toolchain 不使用時も明示指定)
 
 on:

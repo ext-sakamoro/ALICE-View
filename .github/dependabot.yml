@@ -5,7 +5,7 @@
 #       ../ALICE-Physics / ../ALICE-DB の sibling path dep を持ち、
 #       dependabot は sibling repo を checkout しないため
 #       path_dependencies_not_reachable で fail する
-#       (= [[feedback_dependabot_cargo_sibling_path_deps]])
+#       (dependabot が sibling path dep を解決できないため)
 #       root 直接の cargo dep update は手動 `cargo update -p <name>` で対応
 version: 2
 updates:

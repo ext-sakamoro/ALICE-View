@@ -32,6 +32,15 @@ jobs:
           repository: ext-sakamoro/ALICE-LOL
           path: ALICE-LOL
 
+      # Real checkout rather than a stub: `analytics_bridge` names types from
+      # this crate, so an empty stub fails to compile (and a stub that compiles
+      # would be a test double with nothing in it). make-stubs.py skips any
+      # sibling that is already present.
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Analytics
+          path: ALICE-Analytics
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -54,6 +63,13 @@ jobs:
       - name: Test
         working-directory: ALICE-View
         run: cargo test --lib
+
+      # The bridge sits behind an optional feature, so the default build never
+      # compiles it. It was broken for that reason: it imported a `prelude`
+      # module that no longer exists, and nothing noticed.
+      - name: Check the analytics bridge (optional feature)
+        working-directory: ALICE-View
+        run: cargo check --lib --features analytics
 
   fmt:
     name: Format
