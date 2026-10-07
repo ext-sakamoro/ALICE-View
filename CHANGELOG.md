@@ -11,6 +11,7 @@ All notable changes to ALICE-View are documented here.
 - `alice-analytics` の version 要求を `0.2` に追従 実 crate が 0.2.0 になったので `^0.1.1` は解決できず、`cargo metadata` が `failed to select a version for the requirement alice-analytics = "^0.1.1"` で落ちていた (feature 無効でも optional dep は lock に載るので、`analytics` を使わない build も止まる) `.github/actions/alice-stubs/action.yml` の stub version も 0.2.0 に揃えた (`ci.yml` 側は `make-stubs.py` が `Cargo.toml` から導出するので追従不要)
 - `analytics_bridge` が compile できない状態だったのを修正 `alice_analytics::prelude` を import していたが、依存 crate の module 構成が変わった際に `prelude` は無くなっていた 型自体は実在するので `anomaly::MadDetector` と `sketch::{CountMinSketch, DDSketch, HyperLogLog}` から直接 import する形にした
 - CI 設定と manifest の comment を書き直し、外部参照でなく理由そのものを書くようにした (`.github/` 5 file / `Cargo.toml` / `deny.toml` / `fuzz/` 4 file)
+- CI の test job が `alice-lol` の非 optional 依存 `alice-zip` を checkout しておらず、stub 生成の段で止まっていた
 
 ### Added
 - CI に `cargo check --lib --features analytics` を追加し、`ALICE-Analytics` を real checkout するようにした `analytics` は optional feature なので既定 build では 1 行も compile されず、上の `prelude` 不整合はそのために見逃されていた stub は空 crate なので型を名指しする bridge には使えず、`make-stubs.py` は既に存在する sibling を飛ばすので real checkout と併用できる

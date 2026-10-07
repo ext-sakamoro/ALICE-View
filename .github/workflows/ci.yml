@@ -32,6 +32,13 @@ jobs:
           repository: ext-sakamoro/ALICE-LOL
           path: ALICE-LOL
 
+      # alice-lol depends on alice-zip unconditionally (`research_law`), so it
+      # is compiled by the default build and cannot be stubbed.
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Zip
+          path: ALICE-Zip
+
       # Real checkout rather than a stub: `analytics_bridge` names types from
       # this crate, so an empty stub fails to compile (and a stub that compiles
       # would be a test double with nothing in it). make-stubs.py skips any
