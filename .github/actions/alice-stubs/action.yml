@@ -1,115 +1,25 @@
 name: 'ALICE-View Optional Bridge Stubs'
 description: |
-  Create empty stub crates for the ALICE-View sibling path deps
-  (alice-sdf / alice-lol / alice-analytics / alice-physics / alice-db).
-  alice-sdf は mandatory (gpu feature 有効化前提)、その他 4 crate は
-  optional feature (lol / analytics / physics / db)。
+  Create stub crates for the ALICE-View sibling path deps so that jobs which
+  only need the dependency graph to resolve (cargo audit / cargo deny /
+  semver-checks / fuzz) do not have to clone every sibling repository.
 
-  Canonical CI template
+  版と feature は `.github/make-stubs.py` が `Cargo.toml` から導出する
+  ⚠️ ここに literal を書かない — `Cargo.toml` の要求を動かした時に stub が
+  追従せず、resolve 段階で全 job が落ちる (optional dep も lock に載るので
+  feature 無効でも解決される) 2026-10-08 までは literal を書いていて、
+  `alice-analytics` を 0.3 に上げた時に 2 箇所の同期が必要だった
 
-  license = "MIT OR Apache-2.0" 必須 (欠落すると cargo-deny が unlicensed として reject する)
+  ⚠️ `--allow-stub-all` は「消費側の lib を既定 feature で compile しない job」
+  専用 compile する job (ci.yml の build / test) では real checkout を使う
+  (ci.yml は `make-stubs.py` を flag 無しで呼び、compile される dep に stub を
+  置こうとしたら loud fail する)
 
-  ⚠️ version は Cargo.toml の path dep が要求する range を満たすこと
-  path dep に `version` を書いた crate では、stub の version が要求を外すと
-  resolve 段階で落ちる (optional dep も lock に載るので feature 無効でも解決される)
-  Cargo.toml 側の要求を動かしたら、ここの version を同 commit で追従させる
-  (ci.yml は .github/make-stubs.py で Cargo.toml から導出するので追従不要、
-  本 action を使うのは fuzz.yml と security-audit.yml だけ ⚠️ version の
-  source of truth が Cargo.toml とここの 2 つに割れている状態なので、
-  make-stubs.py への移行が根本対応)
+  license = "MIT OR Apache-2.0" は make-stubs.py が入れる
+  (欠落すると cargo-deny が unlicensed として reject する)
 
 runs:
   using: composite
   steps:
     - shell: bash
-      run: |
-        set -euo pipefail
-
-        # ALICE-SDF stub (mandatory dep、`gpu` feature 有効化前提)
-        mkdir -p "../ALICE-SDF/src"
-        cat > "../ALICE-SDF/Cargo.toml" <<'TOML'
-        [package]
-        name = "alice-sdf"
-        version = "5.0.0"
-        edition = "2021"
-        license = "MIT OR Apache-2.0"
-
-        [features]
-        default = ["gpu"]
-        glsl = []
-        gpu = []
-        hlsl = []
-        physics = []
-
-        [lib]
-        path = "src/lib.rs"
-        TOML
-        : > "../ALICE-SDF/src/lib.rs"
-
-        # ALICE-LOL stub (default feature `lol`、実 crate は AGPL-3.0)
-        # stub は CI 内 fake、実 license は反映しない (permissive で cargo-deny 通過)
-        # alice-lol は workspace 内 alice-lol/ subdir の crate
-        mkdir -p "../ALICE-LOL/alice-lol/src"
-        cat > "../ALICE-LOL/alice-lol/Cargo.toml" <<'TOML'
-        [package]
-        name = "alice-lol"
-        version = "0.4.0"
-        edition = "2021"
-        license = "MIT OR Apache-2.0"
-
-        [lib]
-        path = "src/lib.rs"
-        TOML
-        : > "../ALICE-LOL/alice-lol/src/lib.rs"
-
-        # ALICE-Analytics stub (analytics feature 用、`std` default)
-        mkdir -p "../ALICE-Analytics/src"
-        cat > "../ALICE-Analytics/Cargo.toml" <<'TOML'
-        [package]
-        name = "alice-analytics"
-        version = "0.3.0"
-        edition = "2021"
-        license = "MIT OR Apache-2.0"
-
-        [features]
-        default = ["std"]
-        std = []
-
-        [lib]
-        path = "src/lib.rs"
-        TOML
-        : > "../ALICE-Analytics/src/lib.rs"
-
-        # ALICE-Physics stub (physics feature 用、実 crate は AGPL-3.0)
-        mkdir -p "../ALICE-Physics/src"
-        cat > "../ALICE-Physics/Cargo.toml" <<'TOML'
-        [package]
-        name = "alice-physics"
-        version = "1.4.0"
-        edition = "2021"
-        license = "MIT OR Apache-2.0"
-
-        [features]
-        default = ["std"]
-        std = []
-
-        [lib]
-        path = "src/lib.rs"
-        TOML
-        : > "../ALICE-Physics/src/lib.rs"
-
-        # ALICE-DB stub (db feature 用)
-        mkdir -p "../ALICE-DB/src"
-        cat > "../ALICE-DB/Cargo.toml" <<'TOML'
-        [package]
-        name = "alice-db"
-        version = "0.2.0-beta.3"
-        edition = "2021"
-        license = "MIT OR Apache-2.0"
-
-        [lib]
-        path = "src/lib.rs"
-        TOML
-        : > "../ALICE-DB/src/lib.rs"
-
-        echo "Created stubs: alice-sdf / alice-lol / alice-analytics / alice-physics / alice-db (all with license = MIT OR Apache-2.0)"
+      run: python3 "${{ github.action_path }}/../../make-stubs.py" --allow-stub-all

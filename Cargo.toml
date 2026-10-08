@@ -59,15 +59,18 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
 # ALICE ecosystem bridges (optional)
 alice-analytics = { version = "0.3", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
-alice-physics = { version = "1.4", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
-alice-db = { version = "0.2.0-beta.3", path = "../ALICE-DB", optional = true, default-features = false }
+alice-physics = { version = "2.0", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
+alice-db = { version = "0.3.0-beta.2", path = "../ALICE-DB", optional = true, default-features = false }
 
 [features]
 default = ["lol"]
 lol = ["dep:alice-lol"]
 analytics = ["dep:alice-analytics"]  # Rendering performance metrics (DDSketch)
 physics = ["dep:alice-physics"]      # Interactive physics visualization
-db = ["dep:alice-db"]                # Time-series DB query → plot data
+# `alice-db/fs` を明示する: `AliceDB::open` (path 指定の file backend) は
+# `fs` feature 配下なので、`default-features = false` のままだと in-memory
+# backend しか無く db_bridge が compile できない
+db = ["dep:alice-db", "alice-db/fs"]  # Time-series DB query → plot data
 
 # cargo-machete false-positive 予防
 # (cargo-machete が optional dep を未使用と誤判定するのを防ぐ)

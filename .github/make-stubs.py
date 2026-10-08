@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# ci-hygiene: stub-generator
+#   ↑ 自分が「stub を `Cargo.toml` から導出する生成器」であることの宣言
+#     literal の版を探す外部の検査器が、この repo を「stub 無し」と誤判定しないため
 """CI 用の sibling stub を `Cargo.toml` から導出して生成する。
 
 ## なぜ導出するのか
@@ -232,6 +235,20 @@ def collect(repo: pathlib.Path, wanted: dict[str, dict], scanned: set[pathlib.Pa
             continue
         deps, feats = parse_manifest(toml)
         default_set = default_enabled(deps, feats)
+        # ⚠️ dep の feature は宣言の `features = [...]` だけでなく、`[features]` 表の
+        # `<dep>/<feat>` 記法でも要求される (`db = ["dep:alice-db", "alice-db/fs"]`)
+        # こちらを拾わないと stub にその feature が無く、cargo が
+        # 「depends on `X` with feature `f` but `X` does not have that feature」で落ちる
+        # (2026-10-08 実測、本 repo の `db` feature に `alice-db/fs` を足した時)
+        via_feature_table: dict[str, set[str]] = {}
+        for items in feats.values():
+            for item in items:
+                if "/" not in item or item.startswith("dep:"):
+                    continue
+                head, _, feat = item.partition("/")
+                head = head.rstrip("?")   # `foo?/bar` (weak) も feature 自体は要る
+                if head and feat:
+                    via_feature_table.setdefault(head, set()).add(feat)
         for name, d in deps.items():
             path = FIELD["path"].search(d["raw"])
             if not path:
@@ -260,6 +277,7 @@ def collect(repo: pathlib.Path, wanted: dict[str, dict], scanned: set[pathlib.Pa
             if fs:
                 entry["features"].update(
                     f.strip().strip('"') for f in fs.group(1).split(",") if f.strip())
+            entry["features"].update(via_feature_table.get(name, ()))
             if name in default_set:
                 entry["must_compile"].append(toml)
 
@@ -285,9 +303,20 @@ def main() -> int:
         for n, i in sorted(blocked.items()):
             where = ", ".join(str(m) for m in i["must_compile"])
             msg.append(f"  - {n}: 非 optional か default feature から到達 ({where})")
-        msg.append("  workflow に real checkout (actions/checkout / git clone) を足すこと")
-        msg.append("  空 lib を置くと E0432 で落ちるか、中身の無い test double で緑になる")
-        sys.exit("\n".join(msg))
+        # `--allow-stub-all`: manifest の解決だけが要る job 用 (cargo audit / deny /
+        # semver-checks / fuzz) これらは消費側の lib を既定 feature で compile しないので
+        # 空 lib でも通る 版と feature は `Cargo.toml` から導出するので、literal を
+        # workflow 側に書く (= source of truth が 2 つになる) のを避けられる
+        # ⚠️ compile する job で使うと E0432 か「中身の無い test double で緑」になる
+        if "--allow-stub-all" in sys.argv:
+            msg.append("  --allow-stub-all が指定されたので stub を置く "
+                       "(manifest の解決のみを要する job 用)")
+            print("\n".join(msg))
+        else:
+            msg.append("  workflow に real checkout (actions/checkout / git clone) を足すこと")
+            msg.append("  空 lib を置くと E0432 で落ちるか、中身の無い test double で緑になる")
+            msg.append("  解決だけが要る job なら --allow-stub-all を付ける")
+            sys.exit("\n".join(msg))
 
     for crate, info in sorted(wanted.items()):
         version = choose_version(info["reqs"], crate)

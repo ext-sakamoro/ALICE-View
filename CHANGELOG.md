@@ -5,9 +5,13 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Changed
+- `.github/actions/alice-stubs` が stub の版と feature を literal で書くのをやめ、`.github/make-stubs.py --allow-stub-all` に委譲するようにした これで版の出所は `Cargo.toml` 1 箇所になる (従来は `ci.yml` が導出、本 action が literal で、要求を動かすたびに 2 箇所の同期が要った) `--allow-stub-all` は「消費側の lib を既定 feature で compile しない job」(cargo audit / deny / semver-checks / fuzz) 専用で、flag を付けなければ従来どおり compile される dep への stub を拒否する
+- `make-stubs.py` が `[features]` 表の `<dep>/<feat>` 記法 (`db = ["dep:alice-db", "alice-db/fs"]`) を stub の feature として拾うようにした 拾わないと `depends on alice-db with feature fs but alice-db does not have that feature` で resolve 段から落ちる
 - `alice-sdf` の要求を `4.0` から `5.0` に上げた (5.0 で変わった API の利用は無く、code の変更は無い)
 
 ### Fixed
+- `alice-physics` の version 要求を `1.4` から `2.0` に、`alice-db` を `0.2.0-beta.3` から `0.3.0-beta.2` に追従 どちらも実 crate が先に進んでいて `cargo metadata` が解決できない状態だった 2.0.0 の破壊的変更 (`#[non_exhaustive]` の一括付与と enum の variant 追加) に当たる呼び出しは無く、`BodyType` の 3 variant も変わっていないので `physics_bridge` の `match` はそのまま通る
+- `db` feature が `alice-db/fs` を有効化するようにした `AliceDB::open` (path 指定の file backend) は `fs` feature 配下なので、`default-features = false` のままでは in-memory backend しか無く `db_bridge` が compile できない 実測: `cargo check --lib --features db` / `cargo test --lib --features physics,db` (146 件) が exit 0
 - `alice-analytics` の version 要求を `0.3` に追従 実 crate が 0.3.0 になったので `^0.2` は解決できない 0.3.0 は `alice-det-math` を `^0.4` に上げた版で、`analytics_bridge` が使う `anomaly::MadDetector` と `sketch::{CountMinSketch, DDSketch, HyperLogLog}` は API が変わっていない `.github/actions/alice-stubs/action.yml` の stub version も 0.3.0 に揃えた (この action を使うのは `fuzz.yml` と `security-audit.yml` で、`ci.yml` は `make-stubs.py` が `Cargo.toml` から導出する)
 - `alice-analytics` の version 要求を `0.2` に追従 実 crate が 0.2.0 になったので `^0.1.1` は解決できず、`cargo metadata` が `failed to select a version for the requirement alice-analytics = "^0.1.1"` で落ちていた (feature 無効でも optional dep は lock に載るので、`analytics` を使わない build も止まる) `.github/actions/alice-stubs/action.yml` の stub version も 0.2.0 に揃えた (`ci.yml` 側は `make-stubs.py` が `Cargo.toml` から導出するので追従不要)
 - `analytics_bridge` が compile できない状態だったのを修正 `alice_analytics::prelude` を import していたが、依存 crate の module 構成が変わった際に `prelude` は無くなっていた 型自体は実在するので `anomaly::MadDetector` と `sketch::{CountMinSketch, DDSketch, HyperLogLog}` から直接 import する形にした
