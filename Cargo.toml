@@ -58,7 +58,7 @@ chrono = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
 # ALICE ecosystem bridges (optional)
-alice-analytics = { version = "0.2", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
+alice-analytics = { version = "0.3", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
 alice-physics = { version = "1.4", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
 alice-db = { version = "0.2.0-beta.3", path = "../ALICE-DB", optional = true, default-features = false }
 

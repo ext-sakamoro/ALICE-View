@@ -12,8 +12,11 @@ description: |
   ⚠️ version は Cargo.toml の path dep が要求する range を満たすこと
   path dep に `version` を書いた crate では、stub の version が要求を外すと
   resolve 段階で落ちる (optional dep も lock に載るので feature 無効でも解決される)
-  Cargo.toml 側の要求を動かしたら、ここと .github/workflows/ci.yml の stub 生成
-  step の両方を同 commit で追従させる
+  Cargo.toml 側の要求を動かしたら、ここの version を同 commit で追従させる
+  (ci.yml は .github/make-stubs.py で Cargo.toml から導出するので追従不要、
+  本 action を使うのは fuzz.yml と security-audit.yml だけ ⚠️ version の
+  source of truth が Cargo.toml とここの 2 つに割れている状態なので、
+  make-stubs.py への移行が根本対応)
 
 runs:
   using: composite
@@ -64,7 +67,7 @@ runs:
         cat > "../ALICE-Analytics/Cargo.toml" <<'TOML'
         [package]
         name = "alice-analytics"
-        version = "0.2.0"
+        version = "0.3.0"
         edition = "2021"
         license = "MIT OR Apache-2.0"
 

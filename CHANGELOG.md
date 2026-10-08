@@ -8,6 +8,7 @@ All notable changes to ALICE-View are documented here.
 - `alice-sdf` の要求を `4.0` から `5.0` に上げた (5.0 で変わった API の利用は無く、code の変更は無い)
 
 ### Fixed
+- `alice-analytics` の version 要求を `0.3` に追従 実 crate が 0.3.0 になったので `^0.2` は解決できない 0.3.0 は `alice-det-math` を `^0.4` に上げた版で、`analytics_bridge` が使う `anomaly::MadDetector` と `sketch::{CountMinSketch, DDSketch, HyperLogLog}` は API が変わっていない `.github/actions/alice-stubs/action.yml` の stub version も 0.3.0 に揃えた (この action を使うのは `fuzz.yml` と `security-audit.yml` で、`ci.yml` は `make-stubs.py` が `Cargo.toml` から導出する)
 - `alice-analytics` の version 要求を `0.2` に追従 実 crate が 0.2.0 になったので `^0.1.1` は解決できず、`cargo metadata` が `failed to select a version for the requirement alice-analytics = "^0.1.1"` で落ちていた (feature 無効でも optional dep は lock に載るので、`analytics` を使わない build も止まる) `.github/actions/alice-stubs/action.yml` の stub version も 0.2.0 に揃えた (`ci.yml` 側は `make-stubs.py` が `Cargo.toml` から導出するので追従不要)
 - `analytics_bridge` が compile できない状態だったのを修正 `alice_analytics::prelude` を import していたが、依存 crate の module 構成が変わった際に `prelude` は無くなっていた 型自体は実在するので `anomaly::MadDetector` と `sketch::{CountMinSketch, DDSketch, HyperLogLog}` から直接 import する形にした
 - CI 設定と manifest の comment を書き直し、外部参照でなく理由そのものを書くようにした (`.github/` 5 file / `Cargo.toml` / `deny.toml` / `fuzz/` 4 file)
