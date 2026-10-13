@@ -34,7 +34,7 @@ noise = "0.9"
 # path dep の `version` は publish に必須 (path だけだと `cargo package` が
 # "all dependencies must have a version requirement specified when packaging" で落ちる)
 # publish 時は `path` が外れて version 要求だけが残るので、値は相手の実 version に合わせる
-alice-sdf = { version = "5.0", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
+alice-sdf = { version = "6", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
 
 # ALICE-LOL Integration (LOL DSL runtime parser)
 alice-lol = { version = "0.4", path = "../ALICE-LOL/alice-lol", optional = true }
@@ -58,9 +58,9 @@ chrono = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
 # ALICE ecosystem bridges (optional)
-alice-analytics = { version = "0.3", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
-alice-physics = { version = "2.0", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
-alice-db = { version = "0.3.0-beta.2", path = "../ALICE-DB", optional = true, default-features = false }
+alice-analytics = { version = "0.5", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
+alice-physics = { version = "3.0", path = "../ALICE-Physics", optional = true, default-features = false, features = ["std"] }
+alice-db = { version = "0.4", path = "../ALICE-DB", optional = true, default-features = false }
 
 [features]
 default = ["lol"]
