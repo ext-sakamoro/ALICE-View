@@ -37,6 +37,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# `shell: bash` gives `-eo pipefail` to every run step
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_RETRY: "5"
@@ -140,7 +145,7 @@ jobs:
           hits=$(grep -rnE 'TODO|FIXME|XXX|HACK' src/ --include="*.rs" || true)
           if [ -n "$hits" ]; then
             echo "::warning::TODO/FIXME/XXX/HACK found in src/ (informational, not blocking):"
-            echo "$hits" | head -50
+            head -50 <<<"$hits"
           else
             echo "✓ No TODO/FIXME/XXX/HACK in src/"
           fi
@@ -148,55 +153,167 @@ jobs:
   coverage:
     name: Coverage (cargo-llvm-cov、informational)
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # The coverage figure is informational; a build or test failure is not.
+    # This job used to run with `continue-on-error: true` on stubs of the
+    # siblings the lib compiles, and failed to compile (E0432 on alice_sdf)
+    # while reporting success.
     steps:
       - uses: actions/checkout@v5
+        with:
+          path: ALICE-View
+
+      # Real checkouts of the siblings the lib compiles, as in ci.yml (alice-sdf
+      # is non-optional; make-stubs.py refuses to stub alice-lol, which the
+      # default feature reaches, so ALICE-LOL and its non-optional ALICE-Zip are
+      # needed too). Optional siblings are stubbed below.
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-SDF
+          path: ALICE-SDF
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-LOL
+          path: ALICE-LOL
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Zip
+          path: ALICE-Zip
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ALICE-View
 
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
+      - name: Create dependency stubs
+        run: python3 ALICE-View/.github/make-stubs.py
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run coverage
+        working-directory: ALICE-View
         run: |
           cargo llvm-cov --lib --summary-only 2>&1 | tee coverage-summary.txt
+          # no threshold yet: the line coverage when this job first ran for real
+          # (2026-10-13) was 44.94%, recorded as the baseline next to today's figure
+          {
+            echo "### Coverage (informational, no threshold yet; baseline 2026-10-13: lines 44.94%)"
+            grep -E '^TOTAL' coverage-summary.txt || { echo "no TOTAL line"; exit 1; }
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage summary as artifact
         uses: actions/upload-artifact@v6
         with:
           name: coverage-summary
-          path: coverage-summary.txt
+          path: ALICE-View/coverage-summary.txt
           retention-days: 30
 
   semver-checks:
     name: cargo-semver-checks (API compat、informational)
     runs-on: ubuntu-latest
-    # ALICE-View 0.3.0 は publish 予定 (Cargo.toml で publish 明示なし = default true)
-    # v0.3.0 がまだ crates.io に無い場合を想定して git baseline (HEAD~1) で比較
-    # informational only (計画的 API 変更を block しない)
-    continue-on-error: true
+    # Compared with the previous commit (HEAD~1). alice-view is consumed by
+    # other repositories (ALICE-Eco-System, ALICE-View-Studio, ALICE-Animation),
+    # so a semver break fails the job unless Cargo.toml's version says so (a
+    # planned break bumps the version, and check-release then accepts it); a run
+    # that could not check anything fails too. It used to run with `|| true` and
+    # `continue-on-error: true` and checked nothing: the latest
+    # cargo-semver-checks needs rustc >= 1.93 and rust-toolchain.toml pins
+    # 1.92.0, and the lib was built on stubs of the siblings it compiles.
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # baseline-rev 比較のため full history 必要
+          path: ALICE-View
+          fetch-depth: 0  # the HEAD~1 baseline needs the history
+
+      # Real checkouts of the siblings the lib compiles, as in ci.yml (alice-sdf
+      # is non-optional; make-stubs.py refuses to stub alice-lol, which the
+      # default feature reaches, so ALICE-LOL and its non-optional ALICE-Zip are
+      # needed too). Optional siblings are stubbed below.
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-SDF
+          path: ALICE-SDF
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-LOL
+          path: ALICE-LOL
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Zip
+          path: ALICE-Zip
+
+      # cargo-semver-checks documents the crate with its optional features too,
+      # so the optional siblings are real here as well (stubs fail rustdoc)
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Analytics
+          path: ALICE-Analytics
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Physics
+          path: ALICE-Physics
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-DB
+          path: ALICE-DB
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ALICE-View
 
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
+      - name: Create dependency stubs
+        run: python3 ALICE-View/.github/make-stubs.py
 
+      # Pinned: 0.50.0 and later need rustc >= 1.93, and rust-toolchain.toml
+      # pins 1.92.0 (0.49.0 is the last release that supports 1.92). Unpin (or
+      # move to the latest) when rust-toolchain.toml moves to 1.93 or later.
       - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@cargo-semver-checks
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks@0.49.0
 
-      # HEAD~1 と比較 (informational、break あっても block しない)
       - name: Run cargo semver-checks
+        working-directory: ALICE-View
         run: |
-          cargo semver-checks check-release \
-            --package alice-view \
-            --baseline-rev "HEAD~1" \
-            || true
+          set +e
+          # the baseline is a checkout next to this one (not --baseline-rev, which
+          # unpacks HEAD~1 under target/ where the ../ALICE-* path dependencies
+          # do not resolve)
+          git worktree add --detach ../ALICE-View-baseline HEAD~1
+          cargo semver-checks check-release --package alice-view --baseline-root ../ALICE-View-baseline 2>&1 | tee semver.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          # the workflow sets CARGO_TERM_COLOR=always: strip the colour codes before reading
+          sed -E 's/\x1b\[[0-9;]*m//g' semver.log > semver.txt && mv semver.txt semver.log
+          # the run must have compared something: cargo-semver-checks prints
+          # "Checked [ … ] N checks: …" for each crate it compared
+          n=$(grep -oE 'Checked \[[^]]*\] +[0-9]+ checks' semver.log | grep -oE '[0-9]+ checks' | grep -oE '[0-9]+' | head -1 || true)
+          if [ -z "$n" ] || [ "$n" -eq 0 ]; then
+            echo "::error::cargo-semver-checks compared nothing (exit $rc)"
+            exit 1
+          fi
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          base=$(git rev-parse --short HEAD~1)
+          {
+            echo "### cargo-semver-checks"
+            echo "alice-view $version against $base (HEAD~1): $n checks, exit $rc"
+            grep -E 'Summary|FAIL' semver.log | head -20 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" -ne 0 ]; then
+            if grep -qE 'semver requires new (major|minor) version' semver.log; then
+              echo "::error::alice-view $version breaks semver against $base ($n checks): bump the version in Cargo.toml or keep the API"
+            else
+              echo "::error::cargo-semver-checks failed (exit $rc) after $n checks"
+            fi
+            exit 1
+          fi
+          echo "cargo-semver-checks: alice-view $version, $n checks against $base"
