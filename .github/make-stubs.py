@@ -217,7 +217,7 @@ def collect(repo: pathlib.Path, wanted: dict[str, dict], scanned: set[pathlib.Pa
 
     なので sibling 側は「その package の manifest の非 optional path dep」だけ辿る。
     全 manifest を rglob すると、graph に入らない workspace member の要求まで拾い
-    (ALICE-LOL の他 member が `alice-physics = "1.0"`)、version 調停を無意味に
+    (ALICE-LOL の他 member が `alice-physics = "1.0"`)、version 解決を無意味に
     失敗させる。sibling の optional dep が実際に活性化されている場合は cargo が
     同じ error で落ちるので、黙って壊れることはない。
     """
