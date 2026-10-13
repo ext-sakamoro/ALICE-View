@@ -2,7 +2,8 @@ name: 'ALICE-View Optional Bridge Stubs'
 description: |
   Create stub crates for the ALICE-View sibling path deps so that jobs which
   only need the dependency graph to resolve (cargo audit / cargo deny /
-  semver-checks / fuzz) do not have to clone every sibling repository.
+  semver-checks) do not have to clone every sibling repository. (fuzz.yml
+  builds the lib, so it checks out the siblings it compiles, as ci.yml does.)
 
   版と feature は `.github/make-stubs.py` が `Cargo.toml` から導出する
   ⚠️ ここに literal を書かない — `Cargo.toml` の要求を動かした時に stub が

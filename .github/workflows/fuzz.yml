@@ -14,6 +14,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'Cargo.toml'
+      - '.github/make-stubs.py'
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
@@ -21,6 +23,8 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'Cargo.toml'
+      - '.github/make-stubs.py'
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
@@ -43,11 +47,19 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
+# `shell: bash` gives `-eo pipefail` to every run step
+defaults:
+  run:
+    shell: bash
+
 jobs:
   fuzz:
     name: Fuzz — ${{ matrix.target }}
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # A crash or a build failure fails this job. It used to run with
+    # `continue-on-error: true`, and every target had been failing to compile
+    # (E0432 on alice_sdf: the lib was built on an empty stub of a sibling it
+    # compiles) while the run reported success.
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +69,28 @@ jobs:
           - fuzz_alice_metadata
     steps:
       - uses: actions/checkout@v5
+        with:
+          path: ALICE-View
+
+      # Real checkouts of the siblings the lib compiles, as in ci.yml:
+      # alice-sdf is a non-optional dependency, and make-stubs.py refuses to
+      # stub alice-lol (reachable from the default feature) and so needs
+      # ALICE-LOL and its non-optional ALICE-Zip present. Optional siblings
+      # that the fuzz build does not compile are stubbed below.
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-SDF
+          path: ALICE-SDF
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-LOL
+          path: ALICE-LOL
+
+      - uses: actions/checkout@v5
+        with:
+          repository: ext-sakamoro/ALICE-Zip
+          path: ALICE-Zip
 
       # cargo-fuzz は nightly toolchain 必須
       - name: Install nightly toolchain
@@ -64,10 +98,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: fuzz
+          workspaces: ALICE-View/fuzz
 
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
+      # stubs only for the siblings no build here compiles (versions and
+      # features derived from Cargo.toml; it fails loudly for a compiled one)
+      - name: Create dependency stubs
+        run: python3 ALICE-View/.github/make-stubs.py
 
       - name: Install Linux dependencies (for wgpu / winit build)
         run: |
@@ -88,7 +124,7 @@ jobs:
 
       - name: Run fuzz target (time-boxed)
         run: |
-          cd fuzz
+          cd ALICE-View/fuzz
           cargo +nightly fuzz run "${{ matrix.target }}" -- \
             -max_total_time=${{ steps.dur.outputs.seconds }}
 
@@ -97,6 +133,6 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: fuzz-crash-${{ matrix.target }}
-          path: fuzz/artifacts/${{ matrix.target }}
+          path: ALICE-View/fuzz/artifacts/${{ matrix.target }}
           if-no-files-found: ignore
           retention-days: 14
