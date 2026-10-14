@@ -37,7 +37,7 @@ noise = "0.9"
 alice-sdf = { version = "6", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
 
 # ALICE-LOL Integration (LOL DSL runtime parser)
-alice-lol = { version = "0.4", path = "../ALICE-LOL/alice-lol", optional = true }
+alice-lol = { version = ">=0.4.1, <0.6", path = "../ALICE-LOL/alice-lol", optional = true }
 
 # Logging
 log = "0.4"

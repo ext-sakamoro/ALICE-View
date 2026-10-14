@@ -42,7 +42,8 @@ real checkout された sibling の `Cargo.toml` も辿る。sibling 自身が�
 
 要求 range の**下限**を出す。`^4.0`→`4.0.0` / `^0.1.1`→`0.1.1` / `~1.1`→`1.1.0` /
 `=1.2.3`→`1.2.3` / prerelease はその文字列 / version 無しは `0.1.0`。
-range (`>=1, <2`) と wildcard (`*`) は下限が一意でないので **loud fail** する
+範囲 (`>=0.4.1, <0.6`) は `>=` の下限を採り、上限は `satisfies` で突き合わせる。
+wildcard (`*`) や `>=` の無い範囲は下限が一意でないので **loud fail** する
 (黙って `0.1.0` を置くと、また version 不整合を silent に作るため)。
 """
 from __future__ import annotations
@@ -59,6 +60,22 @@ FIELD = {k: re.compile(rf'\b{k}\s*=\s*"([^"]+)"') for k in ("version", "path")}
 OPTIONAL_RE = re.compile(r"\boptional\s*=\s*true\b")
 FEATURES_RE = re.compile(r"\bfeatures\s*=\s*\[([^\]]*)\]")
 SIMPLE_REQ = re.compile(r"^(\^|~|=)?(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
+CMP_REQ = re.compile(r"^(>=|>|<=|<)\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
+
+
+def _triple(m: re.Match) -> list[int]:
+    return [int(m.group(i)) if m.group(i) else 0 for i in (2, 3, 4)]
+
+
+def parse_range(req: str) -> list[tuple[str, list[int]]] | None:
+    """`>=a.b.c, <x.y.z` 形式の範囲を (演算子, 3 桁) の列にする 範囲でなければ None"""
+    out = []
+    for p in (p.strip() for p in req.split(",")):
+        m = CMP_REQ.match(p)
+        if not m:
+            return None
+        out.append((m.group(1), _triple(m)))
+    return out
 DEP_SECTION = re.compile(r"(?:^|\.)(?:dependencies|dev-dependencies|build-dependencies)$")
 
 
@@ -69,6 +86,11 @@ def lower_bound(req: str | None, who: str) -> str:
     req = req.strip()
     if re.match(r"^\d+\.\d+\.\d+-", req):  # prerelease はそのまま
         return req
+    rng = parse_range(req)
+    if rng is not None:
+        lows = [t for op, t in rng if op in (">=", ">")]
+        if lows:
+            return ".".join(str(x) for x in max(lows))
     m = SIMPLE_REQ.match(req)
     if not m:
         sys.exit(
@@ -81,6 +103,13 @@ def lower_bound(req: str | None, who: str) -> str:
 
 def satisfies(version: str, req: str) -> bool:
     """`version` が要求 `req` を満たすか (caret / tilde / exact のみ)"""
+    rng = parse_range(req.strip())
+    if rng is not None:
+        got = [int(x) for x in re.split(r"[.\-+]", version)[:3]]
+        got += [0] * (3 - len(got))
+        ops = {">=": lambda a, b: a >= b, ">": lambda a, b: a > b,
+               "<=": lambda a, b: a <= b, "<": lambda a, b: a < b}
+        return all(ops[op](got, t) for op, t in rng)
     m = SIMPLE_REQ.match(req.strip())
     if not m:
         return True  # 下限を出す側で loud fail 済
