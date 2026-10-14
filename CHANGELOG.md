@@ -5,6 +5,7 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Changed
+- `alice-db` の要求を `0.4` から `0.5` に上げた (公開済みの最新 0.5.0 に追従、使っている API に変更は無く code の変更は無い) 実測: `cargo clippy --all-targets --all-features -- -D warnings` が警告 0、`cargo test --all-features` が lib 148 / bin 122 / 統合 3 件で通る
 - `alice-lol` の要求を `0.4` から `>=0.4.1, <0.6` に広げた 0.4.1 と 0.5.x のどちらでも解決する `.github/make-stubs.py` は `>=` と `<` の範囲要求から下限を導出するようにした (従来は範囲を stub 化できず loud fail)
 - 依存の要求を公開版に追従した: `alice-sdf` `5.0` → `6`、`alice-analytics` `0.3` → `0.5`、`alice-physics` `2.0` → `3.0`、`alice-db` `0.3.0-beta.2` → `0.4` (どの crate も先に進んでいて、旧い要求では `cargo metadata` が解決できなかった) 使っている API に変更は無く、code の変更は無い 実測: `cargo build --lib`、`cargo test --all-features` (lib 148 / bin 122 / 統合 3 件) と `cargo check --lib --features analytics,physics,db` が exit 0、`cargo clippy --all-targets --all-features -- -D warnings` が警告 0
 - `.github/actions/alice-stubs` が stub の版と feature を literal で書くのをやめ、`.github/make-stubs.py --allow-stub-all` に委譲するようにした これで版の出所は `Cargo.toml` 1 箇所になる (従来は `ci.yml` が導出、本 action が literal で、要求を動かすたびに 2 箇所の同期が要った) `--allow-stub-all` は「消費側の lib を既定 feature で compile しない job」(cargo audit / deny / semver-checks / fuzz) 専用で、flag を付けなければ従来どおり compile される dep への stub を拒否する
