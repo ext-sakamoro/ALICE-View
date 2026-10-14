@@ -305,6 +305,9 @@ jobs:
           base=$(python3 .github/semver_gate.py baseline "$EVENT" "${BEFORE:-}" "$BASE_REF" 2>baseline-reason.txt)
           cat baseline-reason.txt
           git worktree add --detach ../ALICE-View-baseline "$base"
+          # a sibling that moved past a requirement of the baseline (alice-db "0.4" against
+          # a sibling at 0.5.0) is resolved from the registry for the baseline only
+          python3 .github/semver_gate.py relax ../ALICE-View-baseline | tee -a baseline-reason.txt
           set +e
           cargo semver-checks check-release --package alice-view --baseline-root ../ALICE-View-baseline 2>&1 | tee semver.log
           rc=${PIPESTATUS[0]}

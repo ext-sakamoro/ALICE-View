@@ -194,5 +194,39 @@ class Decide(unittest.TestCase):
         self.assertFalse(g.decide(log("0.3.0", "0.3.0", summary="") + "error: failed to build baseline\n", 2)[0])
 
 
+class Relax(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        for name, ver in (("ALICE-DB", "0.5.0"), ("ALICE-LOL", "0.4.1")):
+            (root / name).mkdir()
+            (root / name / "Cargo.toml").write_text(f'[package]\nname = "x"\nversion = "{ver}"\n')
+        (root / "base").mkdir()
+        self.toml = root / "base" / "Cargo.toml"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_only_unsatisfied_path_dep_loses_its_path(self):
+        self.toml.write_text(
+            '[dependencies]\n'
+            'alice-db = { version = "0.4", path = "../ALICE-DB", optional = true, default-features = false }\n'
+            'alice-lol = { version = ">=0.4.1, <0.6", path = "../ALICE-LOL", optional = true }\n')
+        notes = g.relax_baseline(self.toml.parent)
+        text = self.toml.read_text()
+        self.assertEqual(len(notes), 1)
+        self.assertIn("alice-db", notes[0])
+        self.assertIn('alice-db = { version = "0.4", optional = true, default-features = false }', text)
+        self.assertIn('path = "../ALICE-LOL"', text)
+
+    def test_path_last_and_nothing_to_change(self):
+        self.toml.write_text('[dependencies]\nalice-db = { version = "0.4", path = "../ALICE-DB" }\n')
+        self.assertEqual(len(g.relax_baseline(self.toml.parent)), 1)
+        self.assertIn('alice-db = { version = "0.4" }', self.toml.read_text())
+        self.toml.write_text('[dependencies]\nalice-db = { version = "0.5", path = "../ALICE-DB" }\n')
+        self.assertEqual(g.relax_baseline(self.toml.parent), [])
+        self.assertIn('path = "../ALICE-DB"', self.toml.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()

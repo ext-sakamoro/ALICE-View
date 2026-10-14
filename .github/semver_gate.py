@@ -42,6 +42,7 @@ only turn a correct red into green:
 
     semver_gate.py baseline <event> <before-sha> <base-ref>   prints the baseline commit
     semver_gate.py decide <log> <exit-code>
+    semver_gate.py relax <baseline-dir>   drops `path` from path dependencies the sibling no longer satisfies
 """
 
 from __future__ import annotations
@@ -49,6 +50,8 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import tomllib
+from pathlib import Path
 
 ZERO = "0" * 40
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -140,7 +143,54 @@ def decide(log: str, rc: int) -> tuple[bool, str]:
     return False, f"{change}: cargo-semver-checks failed (exit {rc}) after {n} checks"
 
 
+def _stubs():
+    """make-stubs.py (its file name has a hyphen) for its version-requirement parser"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("make_stubs", Path(__file__).with_name("make-stubs.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+PATH_DEP_RE = re.compile(r'^(\s*[A-Za-z0-9_-]+\s*=\s*\{[^}\n]*?)\bpath\s*=\s*"([^"]+)"\s*,?\s*([^}\n]*\}.*)$')
+VERSION_RE = re.compile(r'\bversion\s*=\s*"([^"]+)"')
+
+
+def relax_baseline(base_dir: Path) -> list[str]:
+    """Make the baseline resolve from what its own Cargo.toml requires.
+
+    The baseline is an older commit checked out next to the sibling repositories, which are at their
+    current version. A path dependency whose sibling has since moved past the baseline's requirement
+    (alice-db "0.4" against a sibling at 0.5.0) cannot be selected, and cargo stops before any
+    comparison. For exactly those dependencies the `path` is dropped, so the requirement is resolved
+    from the registry as it was when the baseline was written; a version the registry does not have
+    still fails the run (the job then reports it compared nothing). Dependencies whose sibling
+    satisfies the requirement keep their path. Returns one line per dependency changed."""
+    stubs = _stubs()
+    toml = base_dir / "Cargo.toml"
+    out, changed = [], []
+    for line in toml.read_text(encoding="utf-8").splitlines(keepends=True):
+        m = PATH_DEP_RE.match(line)
+        v = VERSION_RE.search(line) if m else None
+        if m and v:
+            sib = (base_dir / m.group(2) / "Cargo.toml")
+            if sib.is_file():
+                sib_ver = tomllib.loads(sib.read_text(encoding="utf-8"))["package"]["version"]
+                if not stubs.satisfies(sib_ver, v.group(1)):
+                    name = line.split("=", 1)[0].strip()
+                    line = m.group(1) + m.group(3).lstrip() + "\n"
+                    line = re.sub(r",\s*,", ",", line).replace("{ ,", "{ ").replace(", }", " }")
+                    changed.append(f"{name} {v.group(1)}: the sibling is {sib_ver}, resolved from the registry")
+        out.append(line)
+    toml.write_text("".join(out), encoding="utf-8")
+    return changed
+
+
 def main(argv: list[str]) -> int:
+    if len(argv) == 2 and argv[0] == "relax":
+        for note in relax_baseline(Path(argv[1])):
+            print(f"semver baseline: {note}")
+        return 0
     if len(argv) == 4 and argv[0] == "baseline":
         reason = baseline_reason(argv[1], argv[2])
         if reason:
