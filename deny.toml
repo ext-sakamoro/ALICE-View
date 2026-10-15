@@ -25,11 +25,6 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 version = 2
 yanked = "deny"
 ignore = [
-    # RUSTSEC-2026-0235 (rkyv 0.7 Rc/Arc archive validation): rkyv は alice-db (db feature) 経由でしか
-    # 到達せず、alice-db の archived 型 (SegmentMetadata / DataSegment / ModelType / DataType) は
-    # Rc / Arc を持たないので advisory 非該当 本 crate は rkyv に直接依存せず何も archive しない
-    # (scripts/no_direct_rkyv.py が変化を検出) root fix は alice-db が rkyv 0.7 を脱する時 (pending)
-    "RUSTSEC-2026-0235",
     # ttf-parser unmaintained (RUSTSEC-2026-0192、epaint/egui transitive、font 描画に必須)
     # 代替 skrifa (Google fontations) 移行は upstream egui/wgpu の判断待ち
     "RUSTSEC-2026-0192",
