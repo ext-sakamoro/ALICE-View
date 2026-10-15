@@ -41,6 +41,14 @@ not a finding. Rules, one per occurrence:
     archive-attr       `#[archive(...)]` / `#[archive_attr(...)]`
     archived-type      `Archived<`
 
+The raw identifier spelling (`r#rkyv`, `r#derive`, `r#archive`, ...) is the
+same identifier and is matched like the plain one. An attribute written
+behind `#[cfg_attr(<predicate>, <attr>, ...)]` (nested to any depth, over any
+number of lines) is checked as if it were written directly, so
+`#[cfg_attr(feature = "x", derive(Archive))]` is `derive-archive` and
+`#[cfg_attr(x, archive(...))]` is `archive-attr`; the predicate itself is not
+an attribute and is not checked.
+
 Skipped directories: target/, node_modules/ and any directory whose name
 starts with a dot (.git, .github, ...).
 
@@ -301,16 +309,21 @@ def blank(src: str) -> str:
     return "".join(out)
 
 
-_RKYV = re.compile(r"(?<![A-Za-z0-9_#])" + CRATE + r"(?![A-Za-z0-9_])")
-_DERIVE = re.compile(r"#\s*\[\s*derive\s*\(([^)]*)\)", re.S)
+_RAW = r"(?:r#)?"  # a raw identifier `r#name` is the identifier `name`
+_RKYV = re.compile(r"(?<![A-Za-z0-9_#])" + _RAW + CRATE + r"(?![A-Za-z0-9_])")
+_DERIVE = re.compile(r"#\s*\[\s*" + _RAW + r"derive\s*\(([^)]*)\)", re.S)
 _ARCHIVE = re.compile(r"(?<![A-Za-z0-9_])Archive(?![A-Za-z0-9_])")
-_ARCHIVE_ATTR = re.compile(r"#\s*!?\s*\[\s*(?:archive|archive_attr)(?![A-Za-z0-9_])")
+_ARCHIVE_ATTR = re.compile(
+    r"#\s*!?\s*\[\s*" + _RAW + r"(?:archive|archive_attr)(?![A-Za-z0-9_])"
+)
+_ATTR_OPEN = re.compile(r"#\s*!?\s*\[")
+_ATTR_NAME = re.compile(r"\s*" + _RAW + r"([A-Za-z_][A-Za-z0-9_]*)\s*")
 _ARCHIVED = re.compile(r"(?<![A-Za-z0-9_])Archived\s*<")
 
 
-def _classify(code: str, pos: int) -> str:
+def _classify(code: str, pos: int, end: int) -> str:
     before = code[max(0, pos - 64):pos]
-    after = code[pos + len(CRATE):pos + len(CRATE) + 64]
+    after = code[end:end + 64]
     if re.search(r"(?<![A-Za-z0-9_])use\s+(?:::\s*)?$", before):
         return "use-rkyv"
     if re.search(r"(?<![A-Za-z0-9_])extern\s+crate\s+$", before):
@@ -322,6 +335,60 @@ def _classify(code: str, pos: int) -> str:
     return "rkyv-ident"
 
 
+def _close(code: str, i: int, op: str, cl: str) -> int:
+    """Index of the bracket closing the one at code[i] (len(code) if none)."""
+    depth = 0
+    for j in range(i, len(code)):
+        if code[j] == op:
+            depth += 1
+        elif code[j] == cl:
+            depth -= 1
+            if depth == 0:
+                return j
+    return len(code)
+
+
+def _split_top(code: str, a: int, b: int) -> list[tuple[int, int]]:
+    """Spans of the comma-separated items of code[a:b] at bracket depth 0."""
+    spans, depth, start = [], 0, a
+    for j in range(a, b):
+        c = code[j]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            spans.append((start, j))
+            start = j + 1
+    spans.append((start, b))
+    return [s for s in spans if code[s[0]:s[1]].strip()]
+
+
+def _cfg_attr_hits(code: str, a: int, b: int, inside: bool) -> list[tuple[int, str]]:
+    """Findings for the attribute code[a:b] (the text between `#[` and `]`).
+
+    Attributes written directly are covered by the top-level rules; this
+    looks through `cfg_attr(<predicate>, <attr>, ...)` and checks each
+    conditional attribute (`inside` is True once behind a cfg_attr).
+    """
+    m = _ATTR_NAME.match(code, a, b)
+    if not m:
+        return []
+    name, rest = m.group(1), m.end()
+    has_args = rest < b and code[rest] == "("
+    close = _close(code, rest, "(", ")") if has_args else rest
+    hits: list[tuple[int, str]] = []
+    if name == "cfg_attr" and has_args:
+        for s, e in _split_top(code, rest + 1, close)[1:]:
+            hits += _cfg_attr_hits(code, s, e, True)
+    elif inside and name == "derive" and has_args:
+        for x in _ARCHIVE.finditer(code, rest + 1, close):
+            hits.append((x.start(), "derive-archive"))
+    elif inside and name in ("archive", "archive_attr"):
+        hits.append((m.start(1), "archive-attr"))
+    return hits
+
+
 def check_rust(text: str, rel: str) -> list[str]:
     code = blank(text)
 
@@ -330,7 +397,7 @@ def check_rust(text: str, rel: str) -> list[str]:
 
     hits: list[tuple[int, str]] = []
     for m in _RKYV.finditer(code):
-        hits.append((line(m.start()), _classify(code, m.start())))
+        hits.append((line(m.start()), _classify(code, m.start(), m.end())))
     for m in _DERIVE.finditer(code):
         for a in _ARCHIVE.finditer(m.group(1)):
             hits.append((line(m.start(1) + a.start()), "derive-archive"))
@@ -338,6 +405,10 @@ def check_rust(text: str, rel: str) -> list[str]:
         hits.append((line(m.start()), "archive-attr"))
     for m in _ARCHIVED.finditer(code):
         hits.append((line(m.start()), "archived-type"))
+    for m in _ATTR_OPEN.finditer(code):
+        end = _close(code, m.end() - 1, "[", "]")
+        for pos, rule in _cfg_attr_hits(code, m.end(), end, False):
+            hits.append((line(pos), rule))
     return [f"{rel}:{n}: {rule}" for n, rule in sorted(set(hits))]
 
 
