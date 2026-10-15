@@ -215,6 +215,94 @@ class Rust(unittest.TestCase):
             self.rs("fn f(x: &Archived<u32>) {}\n"), ["src/lib.rs:1: archived-type"]
         )
 
+    def test_raw_identifier(self):
+        self.assertEqual(self.rs("use r#rkyv::Archive;\n"), ["src/lib.rs:1: use-rkyv"])
+        self.assertEqual(self.rs("use ::r#rkyv as r;\n"), ["src/lib.rs:1: use-rkyv"])
+        self.assertEqual(self.rs("extern crate r#rkyv;\n"), ["src/lib.rs:1: extern-crate-rkyv"])
+        self.assertEqual(
+            self.rs("fn f(b: &[u8]) { let _ = r#rkyv::from_bytes::<u8>(b); }\n"),
+            ["src/lib.rs:1: rkyv-path"],
+        )
+        self.assertEqual(self.rs("#[r#rkyv(derive(Debug))]\nstruct S;\n"), ["src/lib.rs:1: rkyv-attr"])
+        self.assertEqual(self.rs("pub use other::r#rkyv;\n"), ["src/lib.rs:1: rkyv-ident"])
+
+    def test_raw_identifier_attribute_names(self):
+        self.assertEqual(
+            self.rs("#[r#derive(Archive)]\nstruct S;\n"), ["src/lib.rs:1: derive-archive"]
+        )
+        self.assertEqual(
+            self.rs("#[r#archive(check_bytes)]\nstruct S;\n"), ["src/lib.rs:1: archive-attr"]
+        )
+
+    def test_spaced_path_and_group_import(self):
+        self.assertEqual(self.rs("fn f() { rkyv :: to_bytes(); }\n"), ["src/lib.rs:1: rkyv-path"])
+        self.assertEqual(self.rs("use {rkyv::Archive};\n"), ["src/lib.rs:1: rkyv-path"])
+        self.assertEqual(self.rs("use ::{rkyv::Archive};\n"), ["src/lib.rs:1: rkyv-path"])
+
+    def test_cfg_attr_derive(self):
+        self.assertEqual(
+            self.rs('#[cfg_attr(feature = "x", derive(Archive))]\nstruct S;\n'),
+            ["src/lib.rs:1: derive-archive"],
+        )
+
+    def test_cfg_attr_derive_multi_line(self):
+        text = (
+            "#[cfg_attr(\n"
+            '    feature = "x",\n'
+            "    derive(\n"
+            "        Debug,\n"
+            "        Archive,\n"
+            "    )\n"
+            ")]\n"
+            "struct S;\n"
+        )
+        self.assertEqual(self.rs(text), ["src/lib.rs:5: derive-archive"])
+
+    def test_cfg_attr_nested(self):
+        self.assertEqual(
+            self.rs('#[cfg_attr(unix, cfg_attr(feature = "x", derive(Debug, Archive)))]\nstruct S;\n'),
+            ["src/lib.rs:1: derive-archive"],
+        )
+        self.assertEqual(
+            self.rs("#[r#cfg_attr(a, derive(Debug), r#derive(Archive))]\nstruct S;\n"),
+            ["src/lib.rs:1: derive-archive"],
+        )
+
+    def test_cfg_attr_rkyv_path_derive(self):
+        self.assertEqual(
+            self.rs("#[cfg_attr(test, derive(rkyv::Archive))]\nstruct S;\n"),
+            ["src/lib.rs:1: derive-archive", "src/lib.rs:1: rkyv-path"],
+        )
+
+    def test_cfg_attr_archive_attr(self):
+        self.assertEqual(
+            self.rs(
+                "#[cfg_attr(x, archive(check_bytes))]\n"
+                "#[cfg_attr(x, archive_attr(derive(Debug)))]\n"
+                "struct S;\n"
+            ),
+            ["src/lib.rs:1: archive-attr", "src/lib.rs:2: archive-attr"],
+        )
+        self.assertEqual(
+            self.rs("#![cfg_attr(\n    x,\n    archive(check_bytes)\n)]\n"),
+            ["src/lib.rs:3: archive-attr"],
+        )
+
+    def test_similar_forms_do_not_trigger(self):
+        text = (
+            "fn f(r#type: u8) -> u8 { r#type }\n"
+            "#[cfg_attr(test, derive(Debug))]\n"
+            '#[cfg_attr(all(feature = "a", not(test)), derive(Debug, Clone))]\n'
+            "#[cfg_attr(archive, derive(Debug))]\n"
+            "#[cfg_attr(x, archived_note)]\n"
+            "struct S;\n"
+            "// #[cfg_attr(feature = \"x\", derive(Archive))]\n"
+            "/* #[cfg_attr(x, archive(check_bytes))] */\n"
+            'const A: &str = "#[cfg_attr(x, derive(Archive))]";\n'
+            'const B: &str = r#"#[cfg_attr(x, archive_attr(derive(Debug)))]"#;\n'
+        )
+        self.assertEqual(self.rs(text), [])
+
     def test_benches_and_examples_are_read(self):
         files = clean({"benches/b.rs": "use rkyv;\n", "examples/e.rs": "type A = Archived<u8>;\n"})
         problems, _, sources = g.check(tree(files))
