@@ -5,6 +5,7 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Changed
+- `alice-analytics` の要求を `0.5` から `>=0.5, <0.7` に広げた ALICE-Analytics 0.6.0 の sibling に対しても build できる 使っている API に変更は無く code の変更は無い 実測: 0.6.0 の sibling で `cargo check --lib --features analytics` が要求 `^0.5` では解決できず、変更後は exit 0
 - `alice-db` の要求を `0.4` から `0.5` に上げた View は sibling checkout の ALICE-DB 0.5.0 に対して build する crates.io への View の公開は alice-db 0.5.0 が registry に載るまで待つ 使っている API に変更は無く code の変更は無い 実測: `cargo clippy --all-targets --all-features -- -D warnings` が警告 0、`cargo test --all-features` が lib 148 / bin 122 / 統合 3 件で通る
 - `alice-lol` の要求を `0.4` から `>=0.4.1, <0.6` に広げた 0.4.1 と 0.5.x のどちらでも解決する `.github/make-stubs.py` は `>=` と `<` の範囲要求から下限を導出するようにした (従来は範囲を stub 化できず loud fail)
 - 依存の要求を公開版に追従した: `alice-sdf` `5.0` → `6`、`alice-analytics` `0.3` → `0.5`、`alice-physics` `2.0` → `3.0`、`alice-db` `0.3.0-beta.2` → `0.4` (どの crate も先に進んでいて、旧い要求では `cargo metadata` が解決できなかった) 使っている API に変更は無く、code の変更は無い 実測: `cargo build --lib`、`cargo test --all-features` (lib 148 / bin 122 / 統合 3 件) と `cargo check --lib --features analytics,physics,db` が exit 0、`cargo clippy --all-targets --all-features -- -D warnings` が警告 0
