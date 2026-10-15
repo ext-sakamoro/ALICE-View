@@ -68,9 +68,16 @@ jobs:
 
       # advisory-db は audit 実行時に自動取得
       # yanked crate は deny、unmaintained warning は個別 ignore で管理
+      # RUSTSEC-2026-0235 (rkyv 0.7 Rc/Arc archive validation): rkyv is reached only
+      # through alice-db (db feature), whose archived types (SegmentMetadata / DataSegment /
+      # ModelType / DataType) hold no Rc / Arc, so the advisory does not apply. This crate
+      # neither depends on rkyv nor archives anything; scripts/no_direct_rkyv.py fails as soon
+      # as either changes. The root fix is alice-db moving off rkyv 0.7 (pending); the entry
+      # goes when that release is consumed.
       - name: Run cargo audit
         run: |
-          cargo audit --deny yanked
+          cargo audit --deny yanked \
+            --ignore RUSTSEC-2026-0235
 
   deny:
     name: cargo-deny (license + advisories + bans + sources)

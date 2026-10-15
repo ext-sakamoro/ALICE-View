@@ -92,6 +92,14 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
+      # RUSTSEC-2026-0235 interim: this crate must not depend on rkyv directly
+      # or archive anything through it (rkyv is reached only via alice-db, whose
+      # archived types hold no Rc / Arc). The guard fails as soon as that changes.
+      - name: no-direct-rkyv guard (tests)
+        run: python3 scripts/test_no_direct_rkyv.py
+      - name: no-direct-rkyv guard
+        run: python3 scripts/no_direct_rkyv.py
+
   actionlint:
     name: actionlint (workflow YAML 検証)
     runs-on: ubuntu-latest
