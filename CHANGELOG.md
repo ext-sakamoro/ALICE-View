@@ -5,6 +5,7 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Changed
+- `alice-sdf` の要求を `"6"` から `">=6, <8"` に広げた (alice-sdf 7 の変更を受け取れるようにする、6.x でも build できる)
 - `alice-physics` の要求を `"3.0"` から `">=3.0, <5"` に広げた (alice-physics 4.0.0 の変更は bridge の構築子・GPU bridge の trait・privacy の構築子で、この crate はどれも使わない 3.1.0 でも 4.0.0 でも build できる)
 - `alice-analytics` の要求を `0.5` から `>=0.5, <0.7` に広げた ALICE-Analytics 0.6.0 の sibling に対しても build できる 使っている API に変更は無く code の変更は無い 実測: 0.6.0 の sibling で `cargo check --lib --features analytics` が要求 `^0.5` では解決できず、変更後は exit 0
 - `alice-db` の要求を `0.4` から `0.5` に上げた View は sibling checkout の ALICE-DB 0.5.0 に対して build する crates.io への View の公開は alice-db 0.5.0 が registry に載るまで待つ 使っている API に変更は無く code の変更は無い 実測: `cargo clippy --all-targets --all-features -- -D warnings` が警告 0、`cargo test --all-features` が lib 148 / bin 122 / 統合 3 件で通る
