@@ -47,8 +47,8 @@ jobs:
         with:
           repository: ext-sakamoro/ALICE-Analytics
           path: ALICE-Analytics
-          # pinned: alice-analytics is required at >=0.7 (0.7.0 = this commit) while
-          # ALICE-Analytics main may still be 0.6.0; move it with the requirement
+          # pinned: alice-analytics accepts 0.6 and 0.7 (">=0.6, <0.8"); CI checks out
+          # ALICE-Analytics 0.7.0 (this commit) so the newer side is exercised
           ref: bf1abd52f8e2a4b047c83de4086e140233daeeaa
 
       - name: Install Rust toolchain
