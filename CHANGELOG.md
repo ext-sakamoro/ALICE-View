@@ -5,6 +5,7 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Changed
+- `alice-analytics` の要求を `>=0.5, <0.7` から `>=0.6, <0.8` に広げた ALICE-Analytics の 0.6.0 と 0.7.0 (alice-zip 0.11 の型を `law` feature で受け渡す) のどちらの sibling でも build できる CI の ALICE-Analytics の checkout は 0.7.0 の commit (bf1abd52…) に固定した 使っている API に変更は無く code の変更は無い 実測: 0.6.0 (75ac058) と 0.7.0 (bf1abd5) の sibling のそれぞれで `cargo test --features analytics` が lib 141 / bin 122 / 統合 3 件で通る View を公開する前に下限を 0.7 に上げる (公開済みの 0.6.0 は alice-zip 0.10 の型を持つ)
 - `alice-sdf` の要求を `"6"` から `">=6, <8"` に広げた (alice-sdf 7 の変更を受け取れるようにする、6.x でも build できる)
 - `alice-physics` の要求を `"3.0"` から `">=3.0, <5"` に広げた (alice-physics 4.0.0 の変更は bridge の構築子・GPU bridge の trait・privacy の構築子で、この crate はどれも使わない 3.1.0 でも 4.0.0 でも build できる)
 - `alice-analytics` の要求を `0.5` から `>=0.5, <0.7` に広げた ALICE-Analytics 0.6.0 の sibling に対しても build できる 使っている API に変更は無く code の変更は無い 実測: 0.6.0 の sibling で `cargo check --lib --features analytics` が要求 `^0.5` では解決できず、変更後は exit 0
