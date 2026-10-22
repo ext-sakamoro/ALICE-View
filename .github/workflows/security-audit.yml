@@ -173,24 +173,11 @@ jobs:
         with:
           path: ALICE-View
 
-      # Real checkouts of the siblings the lib compiles, as in ci.yml (alice-sdf
-      # is non-optional; make-stubs.py refuses to stub alice-lol, which the
-      # default feature reaches, so ALICE-LOL and its non-optional ALICE-Zip are
-      # needed too). Optional siblings are stubbed below.
-      - uses: actions/checkout@v5
+      # siblings at the commits pinned in .github/actions/siblings (one place)
+      - name: Fetch pinned sibling repositories
+        uses: ./ALICE-View/.github/actions/siblings
         with:
-          repository: ext-sakamoro/ALICE-SDF
-          path: ALICE-SDF
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-LOL
-          path: ALICE-LOL
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-Zip
-          path: ALICE-Zip
+          repos: ALICE-SDF ALICE-LOL ALICE-Zip
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -243,44 +230,11 @@ jobs:
           path: ALICE-View
           fetch-depth: 0  # the HEAD~1 baseline needs the history
 
-      # Real checkouts of the siblings the lib compiles, as in ci.yml (alice-sdf
-      # is non-optional; make-stubs.py refuses to stub alice-lol, which the
-      # default feature reaches, so ALICE-LOL and its non-optional ALICE-Zip are
-      # needed too). Optional siblings are stubbed below.
-      - uses: actions/checkout@v5
+      # siblings at the commits pinned in .github/actions/siblings (one place)
+      - name: Fetch pinned sibling repositories
+        uses: ./ALICE-View/.github/actions/siblings
         with:
-          repository: ext-sakamoro/ALICE-SDF
-          path: ALICE-SDF
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-LOL
-          path: ALICE-LOL
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-Zip
-          path: ALICE-Zip
-
-      # cargo-semver-checks documents the crate with its optional features too,
-      # so the optional siblings are real here as well (stubs fail rustdoc)
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-Analytics
-          path: ALICE-Analytics
-          # pinned: alice-analytics accepts 0.6 and 0.7 (">=0.6, <0.8"); CI checks out
-          # ALICE-Analytics 0.7.0 (this commit) so the newer side is exercised
-          ref: bf1abd52f8e2a4b047c83de4086e140233daeeaa
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-Physics
-          path: ALICE-Physics
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-DB
-          path: ALICE-DB
+          repos: ALICE-SDF ALICE-LOL ALICE-Zip ALICE-Analytics ALICE-Physics ALICE-DB
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

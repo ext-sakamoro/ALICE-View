@@ -72,25 +72,11 @@ jobs:
         with:
           path: ALICE-View
 
-      # Real checkouts of the siblings the lib compiles, as in ci.yml:
-      # alice-sdf is a non-optional dependency, and make-stubs.py refuses to
-      # stub alice-lol (reachable from the default feature) and so needs
-      # ALICE-LOL and its non-optional ALICE-Zip present. Optional siblings
-      # that the fuzz build does not compile are stubbed below.
-      - uses: actions/checkout@v5
+      # siblings at the commits pinned in .github/actions/siblings (one place)
+      - name: Fetch pinned sibling repositories
+        uses: ./ALICE-View/.github/actions/siblings
         with:
-          repository: ext-sakamoro/ALICE-SDF
-          path: ALICE-SDF
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-LOL
-          path: ALICE-LOL
-
-      - uses: actions/checkout@v5
-        with:
-          repository: ext-sakamoro/ALICE-Zip
-          path: ALICE-Zip
+          repos: ALICE-SDF ALICE-LOL ALICE-Zip
 
       # cargo-fuzz は nightly toolchain 必須
       - name: Install nightly toolchain

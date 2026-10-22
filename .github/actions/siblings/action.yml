@@ -1,0 +1,68 @@
+name: 'ALICE-View Sibling Checkout'
+description: |
+  Fetch the ALICE-* sibling repositories that a job builds against, next to the
+  `ALICE-View/` checkout in $GITHUB_WORKSPACE.
+
+  Every sibling is fetched at the commit pinned in the env block below — the
+  one place to change them, shared by ci.yml / fuzz.yml / security-audit.yml —
+  so the same commit of this repo always builds against the same siblings. A
+  pinned commit that cannot be fetched, or a repo name with no pin, fails the
+  step. .github/check_sibling_pins.py fails CI if a workflow checks out a
+  sibling any other way.
+
+  The sibling directories are replaced, so the step refuses to run outside
+  GitHub Actions.
+
+inputs:
+  repos:
+    description: space-separated sibling repository names (e.g. "ALICE-SDF ALICE-LOL")
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        REPOS: ${{ inputs.repos }}
+        # SDF / LOL / Zip / Physics are the same commits as the other ALICE-* repos pin
+        REV_ALICE_SDF: d573ac4f84b4fee43ee6b54a42962da1fd780ee9
+        REV_ALICE_LOL: bf2aeb521a97e50a8bcecf054e2ed3c8d9b2534e
+        REV_ALICE_Zip: a59ba9c0bd511f036180a6f4092c4b99a286567c
+        REV_ALICE_Physics: d3f56c03bad5507338cd88bedf78fd2ae62c1a68
+        # alice-analytics accepts 0.6 and 0.7 (">=0.6, <0.8"); 0.7.0 is checked out
+        # so the newer side is exercised
+        REV_ALICE_Analytics: bf1abd52f8e2a4b047c83de4086e140233daeeaa
+        REV_ALICE_DB: 7e06aa990b124ee1ef2d9a9a462a43399c5e8522
+      run: |
+        set -euo pipefail
+        if [[ "${GITHUB_ACTIONS:-}" != true ]]; then
+          echo "refusing: the siblings action replaces ../ALICE-* and only runs in GitHub Actions" >&2
+          exit 1
+        fi
+        cd "${GITHUB_WORKSPACE}"
+        # URLs are written out literally (hooks match `github.com/<owner>/<repo>`)
+        url_of() {
+          case "$1" in
+            ALICE-SDF) echo "https://github.com/ext-sakamoro/ALICE-SDF.git" ;;
+            ALICE-LOL) echo "https://github.com/ext-sakamoro/ALICE-LOL.git" ;;
+            ALICE-Zip) echo "https://github.com/ext-sakamoro/ALICE-Zip.git" ;;
+            ALICE-Physics) echo "https://github.com/ext-sakamoro/ALICE-Physics.git" ;;
+            ALICE-Analytics) echo "https://github.com/ext-sakamoro/ALICE-Analytics.git" ;;
+            ALICE-DB) echo "https://github.com/ext-sakamoro/ALICE-DB.git" ;;
+            *) return 1 ;;
+          esac
+        }
+        for repo in $REPOS; do
+          var="REV_${repo//-/_}"
+          rev="${!var:-}"
+          if [[ -z "$rev" ]] || ! url=$(url_of "$repo"); then
+            echo "::error::no pinned commit for $repo (add $var and its URL to .github/actions/siblings/action.yml)" >&2
+            exit 1
+          fi
+          rm -rf "$repo"
+          git init -q "$repo"
+          git -C "$repo" remote add origin "$url"
+          git -C "$repo" fetch -q --depth 1 origin "$rev"
+          git -C "$repo" checkout -q --detach FETCH_HEAD
+          echo "$repo @ $(git -C "$repo" rev-parse HEAD)"
+        done
