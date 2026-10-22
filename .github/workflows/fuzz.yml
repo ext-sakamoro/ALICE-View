@@ -12,7 +12,7 @@ name: Fuzz
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'ci/**']
     paths:
       - 'Cargo.toml'
       - '.github/make-stubs.py'
