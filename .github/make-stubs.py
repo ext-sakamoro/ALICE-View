@@ -313,6 +313,10 @@ def collect(repo: pathlib.Path, wanted: dict[str, dict], scanned: set[pathlib.Pa
 
 def main() -> int:
     global WORKDIR
+    # 出力に日本語を含むので UTF-8 で書く (Windows の runner は既定が cp1252 で、
+    # そのままだと print が UnicodeEncodeError で落ちる)
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8")
     # ⚠️ stub は repo の **外** (checkout の親 dir) に書く local で誤実行すると
     # `$HOME/ALICE-Analytics` のような実 repo が無い場所に空 crate を作ってしまうので、
     # CI 以外では明示の opt-in を要求する (local は実 sibling を見る preflight が担当)

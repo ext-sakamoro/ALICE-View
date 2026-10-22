@@ -97,6 +97,12 @@ jobs:
         run: |
           python3 .github/test_check_sibling_pins.py
           python3 .github/check_sibling_pins.py
+      # release.yml runs make-stubs.py on Windows, whose default stdout encoding is
+      # cp1252; its output has non-ASCII text, so run it once with that encoding
+      - name: make-stubs.py under a cp1252 stdout (as on Windows)
+        env:
+          PYTHONIOENCODING: cp1252
+        run: python3 .github/make-stubs.py --allow-stub-all
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
         with:
