@@ -17,6 +17,10 @@ inputs:
   repos:
     description: space-separated sibling repository names (e.g. "ALICE-SDF ALICE-LOL")
     required: true
+  into:
+    description: directory under $GITHUB_WORKSPACE to fetch into ('..' when this repo is checked out at the workspace root)
+    required: false
+    default: '.'
 
 runs:
   using: composite
@@ -24,6 +28,7 @@ runs:
     - shell: bash
       env:
         REPOS: ${{ inputs.repos }}
+        INTO: ${{ inputs.into }}
         # SDF / LOL / Zip / Physics are the same commits as the other ALICE-* repos pin
         REV_ALICE_SDF: d573ac4f84b4fee43ee6b54a42962da1fd780ee9
         REV_ALICE_LOL: bf2aeb521a97e50a8bcecf054e2ed3c8d9b2534e
@@ -39,7 +44,7 @@ runs:
           echo "refusing: the siblings action replaces ../ALICE-* and only runs in GitHub Actions" >&2
           exit 1
         fi
-        cd "${GITHUB_WORKSPACE}"
+        cd "${GITHUB_WORKSPACE}/${INTO}"
         # URLs are written out literally (hooks match `github.com/<owner>/<repo>`)
         url_of() {
           case "$1" in

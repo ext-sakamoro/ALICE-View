@@ -8,32 +8,13 @@ on:
       tag:
         description: "Release tag (e.g. v0.3.0)"
         required: true
+      dry_run:
+        description: "build and test only, do not upload to the release"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
-
-# All ALICE crates that appear as transitive path dependencies.
-# Cargo resolves every path dep (even optional) at resolution time,
-# so we must checkout them all.
-env:
-  SIBLING_REPOS: >-
-    ALICE-SDF
-    ALICE-Analytics
-    ALICE-Physics
-    ALICE-DB
-    ALICE-Codec
-    ALICE-Streaming-Protocol
-    ALICE-Cache
-    ALICE-Font
-    ALICE-ML
-    ALICE-Crypto
-    ALICE-Voice
-    ALICE-Sync
-    ALICE-Queue
-    ALICE-Zip
-    ALICE-Text
-    ALICE-Auth
-    ALICE-Search
 
 jobs:
   build:
@@ -59,18 +40,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Checkout sibling ALICE crates
+      # the same siblings as ci.yml's test job, at the commits pinned in
+      # .github/actions/siblings (this repo is at the workspace root, so they go
+      # next to it); a sibling that cannot be fetched fails the build
+      - name: Fetch pinned sibling repositories
+        uses: ./.github/actions/siblings
+        with:
+          repos: ALICE-SDF ALICE-LOL ALICE-Zip ALICE-Analytics
+          into: ..
+
+      # the optional sibling path deps that the default build does not compile
+      # get manifest stubs (versions / features derived from Cargo.toml)
+      - name: Create dependency stubs
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for repo in $SIBLING_REPOS; do
-            echo "::group::Cloning $repo"
-            git clone --depth 1 \
-              "https://github.com/ext-sakamoro/${repo}.git" \
-              "../${repo}" || true
-            echo "::endgroup::"
-          done
+          py=$(command -v python3 || command -v python)
+          "$py" .github/make-stubs.py
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -133,6 +118,7 @@ jobs:
           "ARCHIVE=$ARCHIVE" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
       - name: Upload to release
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

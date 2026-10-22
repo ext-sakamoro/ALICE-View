@@ -3,6 +3,8 @@
 
 - `.github/workflows/*.yml` に `repository: ext-sakamoro/...` の checkout があれば fail
   (sibling は .github/actions/siblings を通して、そこに固定した commit から取る)
+- workflow の comment 以外の行に `git` / `gh` の clone / fetch や `SIBLING_REPOS` があれば fail
+  (変数で組んだ URL の取得は literal の repository 行を持たないので、形で止める)
 - そこで `repos:` に挙げた repo ごとに、action に `REV_<repo>` (40 桁の sha) と URL が
   無ければ fail
 - action の固定値が 0 件、workflow が 0 件、`repos:` の参照が 0 件でも fail
@@ -16,6 +18,8 @@ import re
 import sys
 
 DIRECT = re.compile(r"^\s*repository:\s*['\"]?ext-sakamoro/", re.M)
+FETCH = re.compile(r"\b(?:git|gh)\b(?:\s+(?:-[cC]\s+\S+|--[\w-]+(?:=\S+)?|-\w+))*\s+(?:repo\s+)?(?:clone|fetch)\b"
+                   r"|\bSIBLING_REPOS\b")
 REPOS = re.compile(r"^\s*repos:\s*(.+?)\s*$", re.M)
 REV = re.compile(r"^\s*REV_(ALICE_[A-Za-z_]+):\s*([0-9a-f]+)\s*$", re.M)
 URL = re.compile(r"(ALICE-[A-Za-z-]+)\)\s*echo\s*\"https://github\.com/ext-sakamoro/\1\.git\"")
@@ -34,6 +38,9 @@ def check(action_text, workflows):
         for m in DIRECT.finditer(text):
             line = text.count("\n", 0, m.start()) + 1
             errors.append(f"{path}:{line}: checks out a sibling directly (use .github/actions/siblings)")
+        for no, line in enumerate(text.splitlines(), 1):
+            if not line.lstrip().startswith("#") and FETCH.search(line):
+                errors.append(f"{path}:{no}: fetches a repository outside .github/actions/siblings")
         for m in REPOS.finditer(text):
             for repo in m.group(1).split():
                 referenced += 1

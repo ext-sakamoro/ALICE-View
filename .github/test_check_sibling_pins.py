@@ -44,6 +44,24 @@ class CheckSiblingPins(unittest.TestCase):
         errors, *_ = c.check(ACTION, {"ci.yml": bad})
         self.assertEqual(len(errors), 1)
 
+    def test_variable_clone_loop_fails(self):
+        bad = GOOD + ('      - run: |\n'
+                      '          for repo in $SIBLING_REPOS; do\n'
+                      '            git clone --depth 1 "https://github.com/ext-sakamoro/${repo}.git" "../${repo}" || true\n'
+                      '          done\n')
+        errors, *_ = c.check(ACTION, {"release.yml": bad})
+        self.assertEqual(len(errors), 2)  # the SIBLING_REPOS loop line and the clone line
+
+    def test_fetch_forms_fail_and_comments_pass(self):
+        for line in ('git -C ../x fetch --depth 1 origin "$rev"', 'gh repo clone "$r"',
+                     'git -c protocol.version=2 clone "$url"', 'env:\n  SIBLING_REPOS: >-'):
+            errors, *_ = c.check(ACTION, {"w.yml": GOOD + "      - run: " + line + "\n"})
+            self.assertEqual(len(errors), 1, line)
+        ok = GOOD + "      # git clone https://github.com/ext-sakamoro/ALICE-SDF.git (comment)\n" \
+                    "      - run: git worktree add --detach ../baseline \"$base\"\n" \
+                    "      - run: gh release upload \"$TAG\" a.zip --clobber\n"
+        self.assertEqual(c.check(ACTION, {"w.yml": ok})[0], [])
+
     def test_unpinned_repo_fails(self):
         bad = GOOD.replace("repos: ALICE-SDF ALICE-LOL", "repos: ALICE-SDF ALICE-DB")
         errors, *_ = c.check(ACTION, {"ci.yml": bad})
