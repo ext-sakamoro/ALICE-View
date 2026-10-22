@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """.github/check_sibling_pins.py の試験 (違反を置いた入力で、検出の歯を確かめる)"""
 
+import contextlib
+import io
 import pathlib
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -71,6 +74,22 @@ class CheckSiblingPins(unittest.TestCase):
         errors, *_ = c.check(ACTION.replace(SHA, "abc1234", 1), {"ci.yml": GOOD})
         self.assertEqual(len(errors), 1)
         self.assertIn("40-character", errors[0])
+
+    def test_empty_repo_fails_cleanly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = c.main(tmp)
+        self.assertEqual(rc, 1)
+        self.assertIn("not found", out.getvalue())
+
+    def test_repo_without_workflows_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            action = pathlib.Path(tmp) / ".github/actions/siblings/action.yml"
+            action.parent.mkdir(parents=True)
+            action.write_text(ACTION, encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(c.main(tmp), 1)
 
     def test_nothing_to_check_fails(self):
         self.assertTrue(c.check("", {"ci.yml": GOOD})[0])

@@ -57,9 +57,13 @@ def check(action_text, workflows):
     return errors, len(revs), len(workflows), referenced
 
 
-def main():
-    root = pathlib.Path(__file__).resolve().parent.parent
-    action = (root / ".github/actions/siblings/action.yml").read_text(encoding="utf-8")
+def main(root=None):
+    root = pathlib.Path(root) if root else pathlib.Path(__file__).resolve().parent.parent
+    action_path = root / ".github/actions/siblings/action.yml"
+    if not action_path.is_file():
+        print(f"FAIL: {action_path.relative_to(root)} not found (no pinned commits to check against)")
+        return 1
+    action = action_path.read_text(encoding="utf-8")
     workflows = {str(p.relative_to(root)): p.read_text(encoding="utf-8")
                  for p in sorted((root / ".github/workflows").glob("*.yml"))}
     errors, n_revs, n_wf, n_ref = check(action, workflows)
