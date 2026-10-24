@@ -78,6 +78,10 @@ allow = [
 # ⚠️ これは **gate を通すための exception であって、伝播を解消するものではない**
 # ALICE-View 自身は permissive 宣言なので、`db` / `physics` feature を有効にした
 # 配布物は AGPL 側の条件を負う README への明示は別途 Backlog (対応 C) にある
+
+[licenses.private]
+ignore = true
+
 [[licenses.exceptions]]
 name = "alice-db"
 allow = ["AGPL-3.0-or-later"]
