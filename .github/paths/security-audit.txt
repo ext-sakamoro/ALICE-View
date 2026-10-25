@@ -1,0 +1,12 @@
+# the paths that run .github/workflows/security-audit.yml (scripts/changed_paths.py decide)
+# on.pull_request.paths of the workflow, when present, must list the same patterns in the same order
+# (scripts/changed_paths.py sync)
+Cargo.toml
+Cargo.lock
+src/**
+deny.toml
+.github/workflows/security-audit.yml
+.github/actions/**
+.github/semver_gate.py
+.github/test_semver_gate.py
+.github/paths/security-audit.txt
