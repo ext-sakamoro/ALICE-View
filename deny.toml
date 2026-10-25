@@ -83,12 +83,12 @@ allow = ["AGPL-3.0-or-later"]
 
 [[licenses.exceptions]]
 name = "alice-physics"
-allow = ["AGPL-3.0-or-later"]
+allow = ["LicenseRef-Proprietary"]
 
 # alice-physics 4.0 is a facade over alice-physics-core (same license)
 [[licenses.exceptions]]
 name = "alice-physics-core"
-allow = ["AGPL-3.0-or-later"]
+allow = ["LicenseRef-Proprietary"]
 
 [[licenses.clarify]]
 name = "ring"
