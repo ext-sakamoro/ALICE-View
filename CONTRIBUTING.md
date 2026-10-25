@@ -64,4 +64,4 @@ Use English, imperative mood. No auto-signatures.
 
 ## License
 
-MIT. Copyright (c) 2026 Moroya Sakamoto.
+`LicenseRef-Proprietary`. The text is [LICENSE-Proprietary](LICENSE-Proprietary).
