@@ -6,7 +6,6 @@
 
 <p align="center">
   <a href="https://github.com/ext-sakamoro/ALICE-View"><img src="https://img.shields.io/badge/version-0.3.0-blue.svg" alt="Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.75+-orange.svg" alt="Rust"></a>
   <a href="#quality"><img src="https://img.shields.io/badge/clippy-pedantic%200-brightgreen.svg" alt="Clippy"></a>
   <a href="#quality"><img src="https://img.shields.io/badge/tests-76%20pass-brightgreen.svg" alt="Tests"></a>

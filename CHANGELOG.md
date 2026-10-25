@@ -6,6 +6,7 @@ All notable changes to ALICE-View are documented here.
 
 ### Changed
 - Licence: `MIT` → `LicenseRef-Proprietary`
+- README の MIT の licence badge を外した (指す LICENSE は既に無い)
 - `src/shaders/{unity,godot,ue5}/README.md` と `CONTRIBUTING.md` の licence の節、`deny.toml` の comment を `LicenseRef-Proprietary` に合わせた
 - 依存: sibling の ALICE-Physics を `50a12e1` に (deny の例外は `LicenseRef-Proprietary`)
 - release.yml (Release Build): sibling を `SIBLING_REPOS` の 16 repo の `git clone … || true` (毎回 main、失敗を黙って捨てる、ALICE-LOL が無い) でなく、ci.yml の test job と同じ 4 repo (ALICE-SDF / ALICE-LOL / ALICE-Zip / ALICE-Analytics) を `.github/actions/siblings` の固定 commit から取り、残りの optional な path 依存は `make-stubs.py` の stub にする 取れない sibling は build を失敗させる `workflow_dispatch` に `dry_run` (build と test だけで release に upload しない) を足した `.github/actions/siblings` に取得先の dir を指定する `into` を足した `.github/check_sibling_pins.py` は workflow の `git` / `gh` の clone / fetch と `SIBLING_REPOS` も fail にする `make-stubs.py` は出力を UTF-8 で書く (Windows の runner の既定の cp1252 では日本語の出力で落ちていた) ci.yml で cp1252 の stdout のまま 1 回走らせる
