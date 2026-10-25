@@ -5,9 +5,8 @@ All notable changes to ALICE-View are documented here.
 ## [Unreleased]
 
 ### Changed
+- Licence: `MIT` → `LicenseRef-Proprietary`
 - 依存: sibling の ALICE-Physics を `50a12e1` に (deny の例外は `LicenseRef-Proprietary`)
-
-### Changed
 - release.yml (Release Build): sibling を `SIBLING_REPOS` の 16 repo の `git clone … || true` (毎回 main、失敗を黙って捨てる、ALICE-LOL が無い) でなく、ci.yml の test job と同じ 4 repo (ALICE-SDF / ALICE-LOL / ALICE-Zip / ALICE-Analytics) を `.github/actions/siblings` の固定 commit から取り、残りの optional な path 依存は `make-stubs.py` の stub にする 取れない sibling は build を失敗させる `workflow_dispatch` に `dry_run` (build と test だけで release に upload しない) を足した `.github/actions/siblings` に取得先の dir を指定する `into` を足した `.github/check_sibling_pins.py` は workflow の `git` / `gh` の clone / fetch と `SIBLING_REPOS` も fail にする `make-stubs.py` は出力を UTF-8 で書く (Windows の runner の既定の cp1252 では日本語の出力で落ちていた) ci.yml で cp1252 の stdout のまま 1 回走らせる
 - CI: ci.yml / fuzz.yml / security-audit.yml の sibling (ALICE-SDF / ALICE-LOL / ALICE-Zip / ALICE-Analytics / ALICE-Physics / ALICE-DB) は `.github/actions/siblings` から、その env の 1 箇所に固定した commit で取る (以前は fuzz と security-audit が毎回 main を checkout し、同じ commit でも sibling の main が動くと結果が変わった) 固定の commit が取れない・固定の無い repo を指定した時は失敗し、GitHub Actions の外では止まる `.github/check_sibling_pins.py` (試験 `.github/test_check_sibling_pins.py`) が、workflow に sibling の直接の checkout があるか、固定の無い repo を指定していたら CI を fail にする workflow は `ci/**` の branch でも走る
 - `alice-physics` の path 依存を `../ALICE-Physics` から `../ALICE-Physics/crates/alice-physics` に移した (ALICE-Physics 4.0 で repository の root の package は `alice-physics-core` になり、`alice-physics` は `crates/alice-physics` の窓口の crate になった 旧 path では cargo が `alice-physics` を見つけられない) `deny.toml` の license の例外に `alice-physics-core` を足した
