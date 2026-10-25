@@ -1,4 +1,4 @@
-# Rust toolchain pin (feedback_clippy_rust_version_drift 準拠)
+# Rust toolchain pin (clippy の版が変わって lint の結果がずれるのを防ぐ)
 [toolchain]
 channel = "1.92.0"
 components = ["rustfmt", "clippy"]

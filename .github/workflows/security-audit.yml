@@ -1,6 +1,5 @@
 name: Security & Hygiene
 
-# canonical CI template
 # ALICE-SDF v1.7.7 (commit 52d26f9) を base に ALICE-View 用に調整
 #
 # 目的:
@@ -146,8 +145,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-
-      # CLAUDE.md「仮実装完了偽装の禁止ルール」準拠
       - name: Detect todo! / unimplemented! / panic!(STUB) in src/**
         run: |
           set -eo pipefail
@@ -163,7 +160,6 @@ jobs:
             echo "$hits"
             echo ""
             echo "Fix: use ? operator, Result<T, E>, or remove the stub."
-            echo "  See CLAUDE.md § 仮実装完了偽装の禁止ルール"
             exit 1
           fi
           echo "✓ No todo! / unimplemented! / panic!(STUB) in src/ (excluding src/bin/)"
