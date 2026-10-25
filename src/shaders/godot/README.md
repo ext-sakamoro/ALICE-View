@@ -193,4 +193,4 @@ For Godot 3.x, rename files to `.shader` and adjust syntax as needed.
 
 ## License
 
-MIT License - Part of Project A.L.I.C.E.
+`LicenseRef-Proprietary`. The text is [LICENSE-Proprietary](../../../LICENSE-Proprietary).

@@ -160,4 +160,4 @@ For URP/HDRP, use Shader Graph with the Custom Function approach.
 
 ## License
 
-MIT License - Part of Project A.L.I.C.E.
+`LicenseRef-Proprietary`. The text is [LICENSE-Proprietary](../../../LICENSE-Proprietary).

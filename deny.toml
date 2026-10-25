@@ -3,7 +3,7 @@
 #
 # ALICE-SDF v1.7.7 (commit 52d26f9) の deny.toml を base に ALICE-View 用に調整
 #
-# ALICE-View 自体は MIT OR Apache-2.0 (permissive) のため自己 exception 不要
+# ALICE-View 自体は publish = false の crate なので licence の検査の対象外 (自己 exception 不要)
 # sibling stubs (alice-sdf / alice-lol / alice-analytics / alice-physics / alice-db) は
 # alice-stubs action で "MIT OR Apache-2.0" で生成される (license 欠落だと
 # cargo-deny が unlicensed として reject する)

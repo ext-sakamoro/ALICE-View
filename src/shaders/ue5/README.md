@@ -112,4 +112,4 @@ void AASPReceiver::OnReceivePacket(const FASPPacket& Packet)
 
 ## License
 
-MIT License - Part of Project A.L.I.C.E.
+`LicenseRef-Proprietary`. The text is [LICENSE-Proprietary](../../../LICENSE-Proprietary).
