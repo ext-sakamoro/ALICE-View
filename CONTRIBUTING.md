@@ -48,7 +48,7 @@ ALICE-View is a wgpu-based real-time renderer with two modes:
 
 1. Create `src/{name}_bridge.rs`
 2. Add feature gate in `Cargo.toml` and `lib.rs`
-3. Document license implications if the dependency is AGPL
+3. Document the dependency's license exception in `deny.toml`
 
 ## Code Style
 

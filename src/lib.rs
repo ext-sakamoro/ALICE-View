@@ -20,11 +20,11 @@
 //!
 //! ## Feature-Gated Modules
 //!
-//! | Feature | Module | Dependency | License |
-//! |---------|--------|-----------|---------|
-//! | `analytics` | `analytics_bridge` | ALICE-Analytics | MIT |
-//! | `physics` | `physics_bridge` | ALICE-Physics | AGPL-3.0 |
-//! | `db` | `db_bridge` | ALICE-DB | Proprietary |
+//! | Feature | Module | Dependency |
+//! |---------|--------|-----------|
+//! | `analytics` | `analytics_bridge` | ALICE-Analytics |
+//! | `physics` | `physics_bridge` | ALICE-Physics |
+//! | `db` | `db_bridge` | ALICE-DB |
 //!
 //! ## Supported Formats
 //!

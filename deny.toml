@@ -73,11 +73,7 @@ allow = [
     "NCSA",              # libfuzzer-sys / LLVM related
 ]
 
-# optional な ALICE sibling は `AGPL-3.0-or-later OR LicenseRef-Commercial` の
-# デュアルで、allow-list 方式では両辺とも通らない
-# ⚠️ これは **gate を通すための exception であって、伝播を解消するものではない**
-# ALICE-View 自身は permissive 宣言なので、`db` / `physics` feature を有効にした
-# 配布物は AGPL 側の条件を負う README への明示は別途 Backlog (対応 C) にある
+# optional な ALICE sibling の license は allow-list に無いので、crate ごとの exception で許可する
 
 [licenses.private]
 ignore = true
@@ -90,7 +86,7 @@ allow = ["AGPL-3.0-or-later"]
 name = "alice-physics"
 allow = ["AGPL-3.0-or-later"]
 
-# alice-physics 4.0 is a facade over alice-physics-core (same dual license)
+# alice-physics 4.0 is a facade over alice-physics-core (same license)
 [[licenses.exceptions]]
 name = "alice-physics-core"
 allow = ["AGPL-3.0-or-later"]
