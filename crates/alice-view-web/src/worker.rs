@@ -33,6 +33,13 @@ impl core::fmt::Display for NoWebGpu {
 
 /// A device and the canvas it draws on.
 pub struct Gpu {
+    /// The adapter the device came from, kept for as long as the device is used: once nothing holds it, the
+    /// browser may let the instance go and later calls fail ("a valid external Instance reference no longer exists")
+    pub adapter: JsValue,
+    /// `navigator.gpu` itself, held for the same reason
+    pub api: JsValue,
+    /// What the browser says of the adapter (`GPUAdapterInfo`: vendor, architecture, description)
+    pub adapter_info: JsValue,
     pub device: JsValue,
     pub queue: JsValue,
     pub context: JsValue,
@@ -112,6 +119,9 @@ pub async fn gpu(canvas: OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
     ]);
     call(&context, "configure", &[&config]).map_err(|_| NoWebGpu::NoContext)?;
     Ok(Gpu {
+        adapter_info: get(&adapter, "info"),
+        adapter: adapter.clone(),
+        api: api.clone(),
         queue: get(&device, "queue"),
         device,
         context: context.into(),
@@ -121,6 +131,38 @@ pub async fn gpu(canvas: OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
 }
 
 impl Gpu {
+    /// Call `report(kind, text)` when the device is lost (`kind` "lost") or reports an error no scope caught
+    /// (`kind` "uncaptured"): what would otherwise only stop the frames without a word
+    pub fn on_trouble(&self, report: impl Fn(&str, String) + 'static) {
+        let report = std::rc::Rc::new(report);
+        let r = report.clone();
+        let lost = Closure::once(move |info: JsValue| {
+            let reason = get(&info, "reason").as_string().unwrap_or_default();
+            let message = get(&info, "message").as_string().unwrap_or_default();
+            r("lost", format!("{reason}: {message}"));
+        });
+        if let Ok(p) = get(&self.device, "lost").dyn_into::<Promise>() {
+            let _ = p.then(&lost);
+        }
+        lost.forget();
+        let r = report;
+        let uncaptured = Closure::<dyn Fn(JsValue)>::new(move |e: JsValue| {
+            let err = get(&e, "error");
+            r(
+                "uncaptured",
+                get(&err, "message")
+                    .as_string()
+                    .unwrap_or_else(|| format!("{err:?}")),
+            );
+        });
+        let _ = call(
+            &self.device,
+            "addEventListener",
+            &[&"uncapturederror".into(), uncaptured.as_ref()],
+        );
+        uncaptured.forget();
+    }
+
     /// A render pipeline for a full-screen pass from WGSL (`vs` and `fs` entry points, layout from
     /// the shader), created with `createRenderPipelineAsync`: the browser compiles it off its GPU
     /// thread, and frames drawn meanwhile with other pipelines are not held up.

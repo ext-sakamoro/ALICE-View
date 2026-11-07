@@ -4,6 +4,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+#[allow(unused_imports)]
+use js_sys::Function;
 use js_sys::{Array, Object, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -95,8 +97,8 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
 }
 
 async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
-    let gpu: Gpu = match worker::gpu(canvas).await {
-        Ok(g) => g,
+    let gpu: Rc<Gpu> = match worker::gpu(canvas).await {
+        Ok(g) => Rc::new(g),
         Err(no) => {
             return worker::post(
                 &obj(&[
@@ -107,8 +109,32 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
             );
         }
     };
+    // what the device says when it is lost or reports an error nobody caught: printed, never silent
+    gpu.on_trouble(|kind, text| {
+        let _ = worker::post(&obj(&[("kind", kind.into()), ("error", text.into())]).into());
+    });
     let quick = gpu.pipeline(QUICK, "vs", "fs").await?;
-    worker::post(&obj(&[("kind", "device".into())]).into())?;
+    // which adapter: on a machine without a GPU's WebGPU it is a software one, which shows the mechanism, not GPU time
+    let info = &gpu.adapter_info;
+    let field = |k: &str| {
+        Reflect::get(info, &k.into())
+            .ok()
+            .and_then(|v| v.as_string())
+            .unwrap_or_default()
+    };
+    let adapter = format!(
+        "{} {} {}",
+        field("vendor"),
+        field("architecture"),
+        field("description")
+    );
+    worker::post(
+        &obj(&[
+            ("kind", "device".into()),
+            ("adapter", adapter.trim().into()),
+        ])
+        .into(),
+    )?;
     let heavy_done = Rc::new(Cell::new(-1.0_f64));
     let mut frame = 0u32;
     let mut asked = 0.0;
@@ -116,21 +142,24 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
         let t = worker::frame().await;
         gpu.draw(&quick, None)?;
         frame += 1;
-        if frame == 10 {
+        // (steps 0: no slow pipeline, where the adapter cannot make one in a worker)
+        if frame == 10 && steps > 0 {
             // compile a slow pipeline while the quick one keeps drawing
             asked = t;
-            let (g, done) = (gpu.device.clone(), heavy_done.clone());
+            let (shared, done) = (gpu.clone(), heavy_done.clone());
             let wgsl = slow_shader(steps);
-            let format = gpu.format.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let shell = Gpu {
-                    device: g,
-                    queue: JsValue::NULL,
-                    context: JsValue::NULL,
-                    format,
-                    canvas: OffscreenCanvas::new(1, 1).unwrap_throw(),
-                };
-                let ok = shell.pipeline(&wgsl, "vs", "fs").await.is_ok();
+                let made = shared.pipeline(&wgsl, "vs", "fs").await;
+                if let Err(e) = &made {
+                    let _ = worker::post(
+                        &obj(&[
+                            ("kind", "heavyError".into()),
+                            ("error", format!("{e:?}").into()),
+                        ])
+                        .into(),
+                    );
+                }
+                let ok = made.is_ok();
                 let now = js_sys::Reflect::get(&worker::scope(), &"performance".into())
                     .ok()
                     .and_then(|p| js_sys::Reflect::get(&p, &"now".into()).ok().map(|f| (p, f)))
