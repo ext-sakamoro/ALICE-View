@@ -333,6 +333,14 @@ pub fn post(message: &JsValue) -> Result<(), JsValue> {
     scope().post_message(message)
 }
 
+/// Wait `ms` milliseconds on the worker's own clock, whether or not any frame is presented
+pub async fn sleep(ms: i32) {
+    let p = Promise::new(&mut |resolve, _| {
+        let _ = scope().set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms);
+    });
+    let _ = JsFuture::from(p).await;
+}
+
 /// The next animation frame of the worker (its own `requestAnimationFrame`, which follows the
 /// canvas's display).
 pub async fn frame() -> f64 {

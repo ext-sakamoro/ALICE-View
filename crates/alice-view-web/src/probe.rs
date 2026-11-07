@@ -150,6 +150,28 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
     let heavy_done = Rc::new(Cell::new(-1.0_f64));
     let mut frame = 0u32;
     let mut asked = 0.0;
+    // the state goes to the page from its own beat, every 16 ms, whether or not a frame is drawn: the mirror does not
+    // depend on the GPU (frame, its time, when the slow pipeline was asked, when it came)
+    let shown = Rc::new(Cell::new((0u32, 0.0f64, 0.0f64)));
+    {
+        let (shown, heavy) = (shown.clone(), heavy_done.clone());
+        wasm_bindgen_futures::spawn_local(async move {
+            for tick in 1..=1200u32 {
+                worker::sleep(16).await;
+                let (frame, t, asked) = shown.get();
+                let _ = worker::post_state(
+                    &obj(&[
+                        ("tick", tick.into()),
+                        ("frame", frame.into()),
+                        ("t", t.into()),
+                        ("asked", asked.into()),
+                        ("heavy", heavy.get().into()),
+                    ])
+                    .into(),
+                );
+            }
+        });
+    }
     loop {
         let t = worker::frame().await;
         gpu.draw(&quick, None)?;
@@ -184,15 +206,7 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
                 done.set(if ok { now } else { -2.0 });
             });
         }
-        worker::post_state(
-            &obj(&[
-                ("frame", frame.into()),
-                ("t", t.into()),
-                ("asked", asked.into()),
-                ("heavy", heavy_done.get().into()),
-            ])
-            .into(),
-        )?;
+        shown.set((frame, t, asked));
         if frame > 600 {
             return Ok(());
         }

@@ -50,7 +50,8 @@ if (mode === "webgpu") {
     }
     const failed = (await said()).find((x) => x.kind === "heavyError");
     check("the slow pipeline was created", m && m.heavy > 0, failed ? failed.error : JSON.stringify(m));
-    const t = await page.evaluate(() => window.__probeTimes());
+    // the beat repeats a frame's time until the next frame: each frame once
+    const t = [...new Set(await page.evaluate(() => window.__probeTimes()))];
     const during = [];
     for (let i = 1; i < t.length; i++) if (t[i - 1] >= m.asked && t[i] <= m.heavy + 100) during.push(t[i] - t[i - 1]);
     check("the worker drew frames while it compiled", during.length >= 3, `${during.length} frames over ${Math.round(m.heavy - m.asked)} ms`);
@@ -60,10 +61,11 @@ if (mode === "webgpu") {
     check("no gap over 50 ms between the worker's frames while it compiled", during.length >= 3 && gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
   }
   // the mirror is the last state the worker posted: read twice a frame apart, it moves on, and it is a plain read
-  const a = await page.evaluate(() => { const x = window.__probeMirror(); return { frame: x.frame, sync: typeof x === "object" }; });
+  // the worker's beat, not its frames: the mirror moves whether or not the GPU draws
+  const a = await page.evaluate(() => { const x = window.__probeMirror(); return { tick: x.tick, sync: typeof x === "object" }; });
   await page.waitForTimeout(200);
-  const b = await page.evaluate(() => window.__probeMirror().frame);
-  check("the mirror is read at once and follows the worker", a.sync && b > a.frame, `${a.frame} -> ${b}`);
+  const b = await page.evaluate(() => window.__probeMirror().tick);
+  check("the mirror is read at once and follows the worker", a.sync && b > a.tick, `${a.tick} -> ${b}`);
   const pt = await page.evaluate(() => window.__pageTimes);
   let pg = 0;
   for (let i = 1; i < pt.length; i++) if (pt[i - 1] >= m.asked) pg = Math.max(pg, pt[i] - pt[i - 1]);
