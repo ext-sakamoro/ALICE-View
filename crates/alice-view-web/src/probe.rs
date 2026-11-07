@@ -30,16 +30,37 @@ const QUICK: &str = "
 
 /// A shader that takes the compiler a while: many unrolled steps of a little SDF march
 fn slow_shader(steps: u32) -> String {
-    let mut body = String::new();
+    // the digits of k, without the formatting machinery (the probe counts toward the size gate)
+    let digits = |mut k: u32| {
+        let mut d = Vec::new();
+        loop {
+            d.push(b'0' + (k % 10) as u8);
+            k /= 10;
+            if k == 0 {
+                break;
+            }
+        }
+        d.reverse();
+        String::from_utf8(d).unwrap_or_default()
+    };
+    let mut out = String::from(QUICK.split("@fragment").next().unwrap_or_default());
+    out.push_str("\n@fragment fn fs(@builtin(position) q: vec4f) -> @location(0) vec4f {\n    var p = vec3f(q.xy / 512.0, -2.0);\n    var d = 1e9;\n    let t = q.x * 0.01;\n");
     for k in 0..steps {
-        body.push_str(&format!(
-            "    d = min(d, length(p - vec3f(sin(t + {k}.0), cos(t * 1.{k}), 0.{k})) - 0.2);\n    p = p + vec3f(0.0, 0.0, d * 0.5);\n"
-        ));
+        let n = digits(k);
+        for part in [
+            "    d = min(d, length(p - vec3f(sin(t + ",
+            &n,
+            ".0), cos(t * 1.",
+            &n,
+            "), 0.",
+            &n,
+            ")) - 0.2);\n    p = p + vec3f(0.0, 0.0, d * 0.5);\n",
+        ] {
+            out.push_str(part);
+        }
     }
-    format!(
-        "{QUICK_VS}\n@fragment fn fs(@builtin(position) q: vec4f) -> @location(0) vec4f {{\n    var p = vec3f(q.xy / 512.0, -2.0);\n    var d = 1e9;\n    let t = q.x * 0.01;\n{body}    return vec4f(d, d * 0.5, 0.2, 1.0);\n}}\n",
-        QUICK_VS = QUICK.split("@fragment").next().unwrap_or_default()
-    )
+    out.push_str("    return vec4f(d, d * 0.5, 0.2, 1.0);\n}\n");
+    out
 }
 
 fn obj(pairs: &[(&str, JsValue)]) -> Object {
@@ -101,11 +122,7 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
         Ok(g) => Rc::new(g),
         Err(no) => {
             return worker::post(
-                &obj(&[
-                    ("kind", "fallback".into()),
-                    ("reason", no.to_string().into()),
-                ])
-                .into(),
+                &obj(&[("kind", "fallback".into()), ("reason", no.words().into())]).into(),
             );
         }
     };
@@ -122,12 +139,7 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
             .and_then(|v| v.as_string())
             .unwrap_or_default()
     };
-    let adapter = format!(
-        "{} {} {}",
-        field("vendor"),
-        field("architecture"),
-        field("description")
-    );
+    let adapter = field("vendor") + " " + &field("architecture") + " " + &field("description");
     worker::post(
         &obj(&[
             ("kind", "device".into()),
@@ -154,7 +166,7 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
                     let _ = worker::post(
                         &obj(&[
                             ("kind", "heavyError".into()),
-                            ("error", format!("{e:?}").into()),
+                            ("error", worker::describe(e).into()),
                         ])
                         .into(),
                     );
@@ -208,8 +220,11 @@ pub fn probe_worker(queued: Array) {
             wasm_bindgen_futures::spawn_local(async move {
                 if let Err(e) = run(canvas, steps).await {
                     let _ = worker::post(
-                        &obj(&[("kind", "error".into()), ("error", format!("{e:?}").into())])
-                            .into(),
+                        &obj(&[
+                            ("kind", "error".into()),
+                            ("error", worker::describe(&e).into()),
+                        ])
+                        .into(),
                     );
                 }
             });

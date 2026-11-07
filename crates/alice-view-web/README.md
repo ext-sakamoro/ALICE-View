@@ -27,11 +27,12 @@ them in a headless Chromium:
 In CI and on a machine whose browser has no GPU WebGPU, the device is SwiftShader, a software implementation. There
 the device is lost ("destroyed") while a second pipeline compiles asynchronously in a worker, with this crate and with
 a plain-JS worker alike, so CI sets `PROBE_ASYNC=skip`: the device, the mirror, the fallback and the size are checked,
-and the async pipeline (the worker drawing while it compiles) is checked where the device stays: Chromium's Vulkan
-WebGPU on Mesa's software Vulkan (lavapipe) in CI, and on a real GPU (`--use-angle=vulkan --disable-vulkan-surface`
+and the async pipeline (the worker drawing while it compiles) is checked where the device stays: in CI on the same
+SwiftShader with Chromium's Vulkan flags (`--use-angle=vulkan --disable-vulkan-surface`, which keep its device alive;
+the lane asserts the adapter's name), and on a real GPU (`--use-angle=vulkan --disable-vulkan-surface`
 on an NVIDIA Ampere: 10 of 10, a 200-213 ms compile with the worker's frames at most 17 ms apart).
 
-`probe/size.py` is the size gate: the crate's code in a browser, gzip -9, at most 50 KB of a page's 500 KB arrival
+`probe/size.py` is the size gate: the crate's code in a browser (built without function names, `strip`), gzip -9, at most 50 KB of a page's 500 KB arrival
 budget (an upper bound: the probe calls every part of the API). It fails when it compares nothing.
 
 ```sh

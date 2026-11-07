@@ -35,6 +35,8 @@ const k = await kinds();
 if (mode === "webgpu") {
   const dev = (await said()).find((m) => m.kind === "device");
   check("a WebGPU device came in the worker, and says its adapter", !!dev && typeof dev.adapter === "string" && dev.adapter.length > 0, JSON.stringify(dev));
+  // PROBE_ADAPTER: the adapter this lane says it measures; another one fails (a lane must not measure what it does not name)
+  if (process.env.PROBE_ADAPTER) check(`the adapter is the one this lane names (${process.env.PROBE_ADAPTER})`, !!dev && dev.adapter.toLowerCase().includes(process.env.PROBE_ADAPTER.toLowerCase()), dev ? dev.adapter : "none");
   let m = null;
   if (skipAsync) {
     console.log("not measured on this runner: the async pipeline (PROBE_ASYNC=skip, software adapter)");

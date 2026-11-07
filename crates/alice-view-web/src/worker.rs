@@ -20,6 +20,19 @@ pub enum NoWebGpu {
     NoContext,
 }
 
+impl NoWebGpu {
+    /// The reason in words, without the formatting machinery
+    #[must_use]
+    pub fn words(&self) -> String {
+        match self {
+            Self::NoApi => String::from("no WebGPU in this browser"),
+            Self::NoAdapter => String::from("WebGPU gave no adapter"),
+            Self::NoDevice(e) => String::from("WebGPU gave no device: ") + e,
+            Self::NoContext => String::from("the canvas gave no webgpu context"),
+        }
+    }
+}
+
 impl core::fmt::Display for NoWebGpu {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -55,7 +68,7 @@ fn get(o: &JsValue, k: &str) -> JsValue {
 fn call(o: &JsValue, method: &str, args: &[&JsValue]) -> Result<JsValue, JsValue> {
     let f: Function = get(o, method)
         .dyn_into()
-        .map_err(|_| JsValue::from_str(&format!("no {method}")))?;
+        .map_err(|_| JsValue::from_str(&(String::from("no ") + method)))?;
     let a = Array::new();
     for x in args {
         a.push(x);
@@ -69,6 +82,14 @@ fn obj(pairs: &[(&str, &JsValue)]) -> Object {
         let _ = Reflect::set(&o, &(*k).into(), v);
     }
     o
+}
+
+/// What a thrown value says: its text, or an error's message (without the formatting machinery a `{:?}` brings)
+#[must_use]
+pub fn describe(v: &JsValue) -> String {
+    v.as_string()
+        .or_else(|| get(v, "message").as_string())
+        .unwrap_or_else(|| String::from("(no message)"))
 }
 
 /// The worker's own scope.
@@ -103,8 +124,8 @@ pub async fn gpu(canvas: OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
     let device = match call(&adapter, "requestDevice", &[]) {
         Ok(p) => JsFuture::from(Promise::from(p))
             .await
-            .map_err(|e| NoWebGpu::NoDevice(format!("{e:?}")))?,
-        Err(e) => return Err(NoWebGpu::NoDevice(format!("{e:?}"))),
+            .map_err(|e| NoWebGpu::NoDevice(describe(&e)))?,
+        Err(e) => return Err(NoWebGpu::NoDevice(describe(&e))),
     };
     let context = canvas
         .get_context("webgpu")
@@ -139,7 +160,7 @@ impl Gpu {
         let lost = Closure::once(move |info: JsValue| {
             let reason = get(&info, "reason").as_string().unwrap_or_default();
             let message = get(&info, "message").as_string().unwrap_or_default();
-            r("lost", format!("{reason}: {message}"));
+            r("lost", reason + ": " + &message);
         });
         if let Ok(p) = get(&self.device, "lost").dyn_into::<Promise>() {
             let _ = p.then(&lost);
@@ -152,7 +173,7 @@ impl Gpu {
                 "uncaptured",
                 get(&err, "message")
                     .as_string()
-                    .unwrap_or_else(|| format!("{err:?}")),
+                    .unwrap_or_else(|| describe(&err)),
             );
         });
         let _ = call(

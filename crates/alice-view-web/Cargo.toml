@@ -31,3 +31,5 @@ probe = []
 opt-level = "z"
 lto = true
 codegen-units = 1
+# no function names in the shipped module (they are not code, and a page does not need them)
+strip = true

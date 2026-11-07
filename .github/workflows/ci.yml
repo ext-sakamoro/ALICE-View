@@ -132,27 +132,17 @@ jobs:
           # the runner's WebGPU is SwiftShader, which loses the device while a second pipeline compiles
           # asynchronously in a worker (measured with a plain-JS worker too): the async pipeline is measured on a real
           # GPU, not here; the device, the mirror, the fallback and the size are
-          PROBE_ASYNC=skip PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/check.mjs http://127.0.0.1:18802/index.html webgpu
+          PROBE_ADAPTER=swiftshader PROBE_ASYNC=skip PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/check.mjs http://127.0.0.1:18802/index.html webgpu
           node probe/check.mjs http://127.0.0.1:18802/index.html none
 
-      # a software GPU that keeps its device: Mesa's Vulkan (lavapipe) under Chromium's Vulkan WebGPU; here the drawing
-      # and the async pipeline are measured (a real GPU measured the same way: an NVIDIA Ampere, 10 of 10)
-      - name: Install Mesa software Vulkan (lavapipe)
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 vulkan-tools
-          icd=$(find /usr/share/vulkan/icd.d -name "lvp_icd*.json" | head -1)
-          echo "lavapipe ICD: $icd"
-          echo "VK_ICD_FILENAMES=$icd" >> "$GITHUB_ENV"
-          VK_ICD_FILENAMES="$icd" vulkaninfo --summary | tee /tmp/vulkaninfo.txt | head -40
-          grep -qi llvmpipe /tmp/vulkaninfo.txt
-
-      - name: Browser checks on lavapipe (drawing and the async pipeline)
+      # SwiftShader again, with Chromium's Vulkan flags: then its device stays alive, so the drawing and the async
+      # pipeline are measured here (the mechanism, not a GPU's time; a real GPU measured the same way: an NVIDIA Ampere,
+      # 10 of 10). The lane asserts the adapter it names
+      - name: Browser checks on software WebGPU with Vulkan flags (SwiftShader, device kept)
         run: |
           python3 -m http.server -d probe 18803 --bind 127.0.0.1 &
           sleep 2
-          PROBE_CHROME_ARGS="--use-angle=vulkan --ignore-gpu-blocklist --disable-gpu-sandbox --disable-vulkan-surface" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu
+          PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="--use-angle=vulkan --ignore-gpu-blocklist --disable-gpu-sandbox --disable-vulkan-surface" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu
 
   actionlint:
     name: actionlint (workflow YAML 検証)
