@@ -86,6 +86,52 @@ jobs:
       - name: no-direct-rkyv guard
         run: python3 scripts/no_direct_rkyv.py
 
+  web:
+    name: Web worker renderer (crates/alice-view-web)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/alice-view-web
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.92.0
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt -- --check
+
+      - name: Clippy (wasm32, with and without the probe)
+        run: |
+          cargo clippy --release --target wasm32-unknown-unknown -- -D warnings
+          cargo clippy --release --target wasm32-unknown-unknown --features probe -- -D warnings
+
+      # the CLI must be the same version as the wasm-bindgen crate the build resolved
+      - name: Install wasm-bindgen-cli
+        run: |
+          v=$(cargo metadata --format-version 1 | python3 -c "import json,sys; print(next(p['version'] for p in json.load(sys.stdin)['packages'] if p['name'] == 'wasm-bindgen'))")
+          cargo install wasm-bindgen-cli --version "$v" --locked
+
+      - name: Size gate
+        run: python3 probe/size.py
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Browser checks (SwiftShader WebGPU, then none)
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          python3 -m http.server -d probe 18802 --bind 127.0.0.1 &
+          sleep 2
+          ln -s "$PWD/node_modules" probe/node_modules
+          PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/check.mjs http://127.0.0.1:18802/index.html webgpu
+          node probe/check.mjs http://127.0.0.1:18802/index.html none
+
   actionlint:
     name: actionlint (workflow YAML 検証)
     runs-on: ubuntu-latest

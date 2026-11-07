@@ -1,0 +1,33 @@
+[package]
+name = "alice-view-web"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+license = "LicenseRef-Proprietary"
+description = "A renderer in a Web Worker on an OffscreenCanvas: WebGPU device, pipelines created without blocking, and a state mirror on the page"
+publish = false
+
+# its own workspace: it builds without the viewer's native dependencies
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+  "Window", "Document", "Element", "HtmlCanvasElement", "OffscreenCanvas", "Worker", "WorkerOptions", "WorkerType",
+  "MessageEvent", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "Navigator", "WorkerNavigator",
+  "ResizeObserver", "Event", "EventTarget",
+] }
+
+[features]
+# a page and a worker that exercise the crate in a browser (the checks in probe/ drive them)
+probe = []
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

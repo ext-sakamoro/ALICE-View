@@ -4,6 +4,9 @@ All notable changes to ALICE-View are documented here.
 
 ## [Unreleased]
 
+### Added
+- `crates/alice-view-web` (自分の workspace、依存は wasm-bindgen / js-sys / web-sys だけ): Web Worker の中で `OffscreenCanvas` に WebGPU で描く renderer の土台 page 側は canvas を worker に渡し、大きさを送り、worker が毎 frame 送る状態の鏡を往復なしで読める (`page::RenderHost`) worker 側は device を取る (無ければ理由 `NoWebGpu`、page は WebGL2 などで描く)、`createRenderPipelineAsync` で pipeline を作る (browser が GPU の thread の外で compile し、その間も他の pipeline で描く frame が止まらない)、全画面の pass を描き、状態を送る WebGPU は `js_sys::Reflect` で呼ぶ (不安定な cfg が要らない) 確認は `probe/check.mjs` (headless Chromium、device・compile 中も worker が描き続けること・鏡・WebGPU が無い時の理由) と `probe/size.py` (gzip -9 で 50 KB 以下、比較 0 件は失敗)、CI の `web` job で走る 実測 (arm64 の Linux、SwiftShader の WebGPU): 174 ms の compile の間に worker の frame 16、最長の間隔 17 ms、gzip -9 で 47,748 byte SwiftShader は software の実装なので、仕組みを示すが GPU の時間は示さない
+
 ### Changed
 - Licence: `MIT` → `LicenseRef-Proprietary`
 - README の MIT の licence badge を外した (指す LICENSE は既に無い)

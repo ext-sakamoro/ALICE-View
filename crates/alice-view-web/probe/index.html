@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>alice-view-web probe</title>
+<canvas id="c" style="width:640px;height:360px"></canvas>
+<script type="module">
+  import init, { probe_page } from "./pkg/alice_view_web.js";
+  // the page's own frames: a gap here is a frame the visitor would not see
+  window.__pageTimes = [];
+  const tick = (t) => { window.__pageTimes.push(t); requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+  await init();
+  probe_page(Number(new URLSearchParams(location.search).get("steps") || 64));
+</script>
