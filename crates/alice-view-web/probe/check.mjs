@@ -90,10 +90,12 @@ if (mode === "webgpu") {
       // jitter, not a stall)
       const want = Math.ceil(window / 50) - 1;
       check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted (no gap over 50 ms), ${period.toFixed(1)} ms a frame`);
-      // the compile adds no stall: no gap over 50 ms, or none longer than the same run shows with no compile plus one
-      // frame (a shared machine that pauses the page pauses it in both windows; a compile that blocks the thread only in
-      // the first)
-      check("no gap over 50 ms between the render thread's frames while it compiled, beyond what the machine shows without a compile", gap <= 50 || gap <= ctrlGap + period, `${Math.round(gap)} ms over ${during.length} frames while it compiled, ${Math.round(ctrlGap)} ms over ${control.length} frames without, ${period.toFixed(1)} ms a frame`);
+      // a stall is a gap over 50 ms. One run cannot tell a compile that blocks the thread from the machine pausing the
+      // page (a rare, independent event that seldom hits both windows of one run), so each run says its stalls and the
+      // lane counts them over its runs: the compile's stalls may exceed the control window's by at most one
+      if (gap > 50) console.log(`STALL compile ${Math.round(gap)} ms`);
+      if (ctrlGap > 50) console.log(`STALL control ${Math.round(ctrlGap)} ms`);
+      if (!process.env.PROBE_LANE_COUNTS_STALLS) check("no gap over 50 ms between the render thread's frames while it compiled", gap <= 50, `${Math.round(gap)} ms over ${during.length} frames while it compiled, ${Math.round(ctrlGap)} ms over ${control.length} frames without`);
       console.log("ASYNC-MEASURED 1");
     }
   }

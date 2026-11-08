@@ -22,7 +22,7 @@ them in a headless Chromium:
 | check | what it shows |
 |---|---|
 | a WebGPU device came in the render thread | `render_thread::gpu` on a transferred canvas |
-| the slow pipeline was created, the render thread drew frames while it compiled, no gap over 50 ms meanwhile beyond what the same run shows without a compile | `Gpu::pipeline` does not hold up the render thread's frames |
+| the slow pipeline was created, the render thread drew frames while it compiled, no gap over 50 ms meanwhile (on the shared software lane: no more such stalls over its runs than in equal windows without a compile, plus one) | `Gpu::pipeline` does not hold up the render thread's frames |
 | the mirror is read at once and follows the render thread | `RenderHost::mirror` |
 | without WebGPU the render thread says why | `NoWebGpu` and its message |
 
@@ -31,7 +31,7 @@ the device is lost ("destroyed") while a second pipeline compiles asynchronously
 a plain-JS render thread alike, so CI sets `PROBE_ASYNC=skip`: the device, the mirror, the fallback and the size are checked,
 and the async pipeline (the render thread drawing while it compiles) is checked where the device stays: in CI on the same
 SwiftShader with Chromium's Vulkan flags (`--use-angle=vulkan --disable-vulkan-surface`) over Mesa's software Vulkan
-(lavapipe; without it the same lane lost its device, so the step is load-bearing). The check holds the render thread to no gap over 50 ms while it compiles (and so at least ceil(window / 50) − 1 frames), or, on a machine that pauses the page by itself, to no gap longer than the same run shows in an equal window after the compile plus one frame (both gaps are printed); it calls a compile under 100 ms "not measured": that lane compiles a 512-step slow shader and needs at least 10 of its 20 runs measured. `probe/gpuinfo.mjs` prints what
+(lavapipe; without it the same lane lost its device, so the step is load-bearing). The check holds the render thread to no gap over 50 ms while it compiles (and so at least ceil(window / 50) − 1 frames), and the Mesa lane, on a shared machine that pauses the page now and then, counts over its 20 runs the stalls (gaps over 50 ms) while compiling and in an equal window after the compile, and allows at most one more of the first (every run prints both gaps); it calls a compile under 100 ms "not measured": that lane compiles a 512-step slow shader and needs at least 10 of its 20 runs measured. `probe/gpuinfo.mjs` prints what
 Chromium then uses (WebGL renderer, WebGPU adapter): the lane asserts both (`PROBE_WEBGL=llvmpipe`, `PROBE_ADAPTER`)
 and runs 20 times. Without WebGPU (`none`) the check reads the fallback's colour back from the screen. And on a real GPU (`--use-angle=vulkan --disable-vulkan-surface`
 on an NVIDIA Ampere: 10 of 10, a 200-213 ms compile with the render thread's frames at most 17 ms apart).

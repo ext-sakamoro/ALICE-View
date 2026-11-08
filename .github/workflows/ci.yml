@@ -160,7 +160,7 @@ jobs:
           for i in $(seq 1 20); do
             # 512 steps: at the default 96 this software adapter compiles the slow pipeline in 30-50 ms, too short to
             # hold the frames the check counts (a run under 100 ms is "not measured")
-            PROBE_STEPS=512 PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="$flags" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu > "/tmp/lane-$i.txt" 2>&1 || failed=$((failed + 1))
+            PROBE_LANE_COUNTS_STALLS=1 PROBE_STEPS=512 PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="$flags" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu > "/tmp/lane-$i.txt" 2>&1 || failed=$((failed + 1))
           done
           tail -12 /tmp/lane-1.txt
           echo "software WebGPU over Mesa Vulkan: $failed of 20 runs failed"
@@ -173,6 +173,12 @@ jobs:
           test "$failed" -eq 0
           # most runs must measure: 512 steps measured 20 of 20 on this runner
           test "$measured" -ge 10
+          # a stall is a gap over 50 ms (each measured run says its own). A compile that blocks the thread stalls most
+          # runs while the control windows do not; the machine pausing the page now and then shows in both counts
+          stall_c=$(cat /tmp/lane-*.txt | grep -c '^STALL compile' || true)
+          stall_n=$(cat /tmp/lane-*.txt | grep -c '^STALL control' || true)
+          echo "stalls over 50 ms: $stall_c of $measured runs while compiling, $stall_n without a compile"
+          test "$stall_c" -le $((stall_n + 1))
 
   actionlint:
     name: actionlint (workflow YAML 検証)
