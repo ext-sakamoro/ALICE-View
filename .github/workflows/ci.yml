@@ -132,7 +132,7 @@ jobs:
           # the runner's WebGPU is SwiftShader, which loses the device while a second pipeline compiles
           # asynchronously in a worker (measured with a plain-JS worker too): the async pipeline is measured on a real
           # GPU, not here; the device, the mirror, the fallback and the size are
-          PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/gpuinfo.mjs http://127.0.0.1:18802/index.html
+          PROBE_WEBGL=swiftshader PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/gpuinfo.mjs http://127.0.0.1:18802/index.html
           PROBE_ADAPTER=swiftshader PROBE_ASYNC=skip PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/check.mjs http://127.0.0.1:18802/index.html webgpu
           node probe/check.mjs http://127.0.0.1:18802/index.html none
 
@@ -155,7 +155,7 @@ jobs:
           python3 -m http.server -d probe 18803 --bind 127.0.0.1 &
           sleep 2
           flags="--use-angle=vulkan --ignore-gpu-blocklist --disable-gpu-sandbox --disable-vulkan-surface"
-          PROBE_CHROME_ARGS="$flags" node probe/gpuinfo.mjs http://127.0.0.1:18803/index.html
+          PROBE_WEBGL=llvmpipe PROBE_CHROME_ARGS="$flags" node probe/gpuinfo.mjs http://127.0.0.1:18803/index.html
           failed=0
           for i in $(seq 1 20); do
             PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="$flags" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu > "/tmp/lane-$i.txt" 2>&1 || failed=$((failed + 1))

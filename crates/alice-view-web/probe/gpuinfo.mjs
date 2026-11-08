@@ -24,4 +24,11 @@ if (/no WebGL2/.test(info.webgl) && /no adapter/.test(info.webgpu)) {
   console.log("gpuinfo: read nothing");
   process.exit(2);
 }
+// PROBE_WEBGL names what the lane is for: the WebGL renderer must contain it (Chromium can fall back to another
+// backend without saying so; the lane then is not what its name says)
+const wantWebgl = process.env.PROBE_WEBGL;
 await browser.close();
+if (wantWebgl && !info.webgl.toLowerCase().includes(wantWebgl.toLowerCase())) {
+  console.log(`gpuinfo: the WebGL renderer is not ${wantWebgl}`);
+  process.exit(1);
+}

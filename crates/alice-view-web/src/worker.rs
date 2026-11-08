@@ -5,15 +5,17 @@ use js_sys::{Array, Function, Object, Promise, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{DedicatedWorkerGlobalScope, OffscreenCanvas};
+use web_sys::{DedicatedWorkerGlobalScope, OffscreenCanvas, WebGl2RenderingContext};
 
-/// Why there is no WebGPU here: the page then draws another way.
+/// Why there is no WebGPU here. Every case but [`NoWebGpu::NoContext`] comes before the canvas is asked for a
+/// `webgpu` context, so [`webgl2`] can still draw on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NoWebGpu {
     /// `navigator.gpu` is absent (no WebGPU in this browser, or not in workers).
     NoApi,
-    /// The browser has WebGPU but gave no adapter (blocked GPU, or none).
-    NoAdapter,
+    /// The browser has WebGPU but gave no adapter: none (blocked GPU, or no GPU), or the request was refused, with its
+    /// words.
+    NoAdapter(String),
     /// The adapter gave no device.
     NoDevice(String),
     /// The canvas gave no `webgpu` context.
@@ -26,7 +28,8 @@ impl NoWebGpu {
     pub fn words(&self) -> String {
         match self {
             Self::NoApi => String::from("no WebGPU in this browser"),
-            Self::NoAdapter => String::from("WebGPU gave no adapter"),
+            Self::NoAdapter(e) if e.is_empty() => String::from("WebGPU gave no adapter"),
+            Self::NoAdapter(e) => String::from("WebGPU gave no adapter: ") + e,
             Self::NoDevice(e) => String::from("WebGPU gave no device: ") + e,
             Self::NoContext => String::from("the canvas gave no webgpu context"),
         }
@@ -37,7 +40,8 @@ impl core::fmt::Display for NoWebGpu {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::NoApi => write!(f, "no WebGPU in this browser"),
-            Self::NoAdapter => write!(f, "WebGPU gave no adapter"),
+            Self::NoAdapter(e) if e.is_empty() => write!(f, "WebGPU gave no adapter"),
+            Self::NoAdapter(e) => write!(f, "WebGPU gave no adapter: {e}"),
             Self::NoDevice(e) => write!(f, "WebGPU gave no device: {e}"),
             Self::NoContext => write!(f, "the canvas gave no webgpu context"),
         }
@@ -97,6 +101,14 @@ pub fn describe(v: &JsValue) -> String {
 /// # Panics
 ///
 /// When called outside a dedicated worker.
+/// The other way to draw on `canvas` when there is no WebGPU: a WebGL2 context, in the worker, on the same canvas.
+/// `None` when the browser has no WebGL2 either, or the canvas already has another context (after
+/// [`NoWebGpu::NoContext`]).
+#[must_use]
+pub fn webgl2(canvas: &OffscreenCanvas) -> Option<WebGl2RenderingContext> {
+    canvas.get_context("webgl2").ok().flatten()?.dyn_into().ok()
+}
+
 #[must_use]
 pub fn scope() -> DedicatedWorkerGlobalScope {
     js_sys::global().unchecked_into()
@@ -107,7 +119,7 @@ pub fn scope() -> DedicatedWorkerGlobalScope {
 /// # Errors
 ///
 /// [`NoWebGpu`] says which step gave nothing.
-pub async fn gpu(canvas: OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
+pub async fn gpu(canvas: &OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
     let api = get(&scope().navigator().into(), "gpu");
     if api.is_undefined() || api.is_null() {
         return Err(NoWebGpu::NoApi);
@@ -115,11 +127,11 @@ pub async fn gpu(canvas: OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
     let adapter = match call(&api, "requestAdapter", &[]) {
         Ok(p) => JsFuture::from(Promise::from(p))
             .await
-            .unwrap_or(JsValue::NULL),
-        Err(_) => JsValue::NULL,
+            .map_err(|e| NoWebGpu::NoAdapter(describe(&e)))?,
+        Err(e) => return Err(NoWebGpu::NoAdapter(describe(&e))),
     };
     if adapter.is_null() || adapter.is_undefined() {
-        return Err(NoWebGpu::NoAdapter);
+        return Err(NoWebGpu::NoAdapter(String::new()));
     }
     let device = match call(&adapter, "requestDevice", &[]) {
         Ok(p) => JsFuture::from(Promise::from(p))
@@ -147,7 +159,7 @@ pub async fn gpu(canvas: OffscreenCanvas) -> Result<Gpu, NoWebGpu> {
         device,
         context: context.into(),
         format,
-        canvas,
+        canvas: canvas.clone(),
     })
 }
 

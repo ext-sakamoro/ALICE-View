@@ -20,7 +20,7 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = [
   "Window", "Document", "Element", "HtmlCanvasElement", "OffscreenCanvas", "Worker", "WorkerOptions", "WorkerType",
   "MessageEvent", "DedicatedWorkerGlobalScope", "WorkerGlobalScope", "Navigator", "WorkerNavigator",
-  "ResizeObserver", "Event", "EventTarget",
+  "ResizeObserver", "Event", "EventTarget", "WebGl2RenderingContext",
 ] }
 
 [features]

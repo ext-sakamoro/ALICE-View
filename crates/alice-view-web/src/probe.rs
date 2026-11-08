@@ -118,12 +118,21 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
 }
 
 async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
-    let gpu: Rc<Gpu> = match worker::gpu(canvas).await {
+    let gpu: Rc<Gpu> = match worker::gpu(&canvas).await {
         Ok(g) => Rc::new(g),
         Err(no) => {
-            return worker::post(
+            worker::post(
                 &obj(&[("kind", "fallback".into()), ("reason", no.words().into())]).into(),
-            );
+            )?;
+            // the other way, on the same canvas: one known colour, which the check reads back from the screen
+            return match worker::webgl2(&canvas) {
+                Some(gl) => {
+                    gl.clear_color(0.25, 0.5, 0.75, 1.0);
+                    gl.clear(web_sys::WebGl2RenderingContext::COLOR_BUFFER_BIT);
+                    worker::post(&obj(&[("kind", "fallback-drawn".into())]).into())
+                }
+                None => worker::post(&obj(&[("kind", "fallback-none".into())]).into()),
+            };
         }
     };
     // what the device says when it is lost or reports an error nobody caught: printed, never silent

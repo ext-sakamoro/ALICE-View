@@ -42,17 +42,24 @@ impl RenderHost {
     ///
     /// # Errors
     ///
-    /// When the canvas cannot be transferred (it already has a context, or the browser has no
-    /// `OffscreenCanvas`) or the worker cannot start.
+    /// When the worker cannot start or the canvas cannot be transferred (it already has a context, or the browser
+    /// has no `OffscreenCanvas`). Either way the canvas is left as it was, the page's to draw on.
     pub fn start(
         canvas: &HtmlCanvasElement,
         script: &str,
         init: &JsValue,
     ) -> Result<Self, JsValue> {
-        let offscreen = canvas.transfer_control_to_offscreen()?;
+        // the worker first: if it cannot start, the canvas is still the page's to draw on
         let options = WorkerOptions::new();
         options.set_type(WorkerType::Module);
         let worker = Worker::new_with_options(script, &options)?;
+        let offscreen = match canvas.transfer_control_to_offscreen() {
+            Ok(o) => o,
+            Err(e) => {
+                worker.terminate();
+                return Err(e);
+            }
+        };
         let mirror = Rc::new(RefCell::new(JsValue::NULL));
         let listener: Rc<RefCell<Option<Listener>>> = Rc::new(RefCell::new(None));
         let on_message = {

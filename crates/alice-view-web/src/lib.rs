@@ -7,9 +7,9 @@
 //!
 //! - [`page`]: on the page. Hands the canvas to a worker, forwards its size, and keeps a mirror of
 //!   the state the worker posts every frame, so the page can read it at once, without a round trip.
-//! - [`worker`]: in the worker. Gets a WebGPU device from the canvas, or says why it cannot (the page
-//!   then draws with what it has, e.g. WebGL2), creates pipelines without blocking, draws a
-//!   full-screen pass, and posts its state.
+//! - [`worker`]: in the worker. Gets a WebGPU device from the canvas, or says why it cannot and gives a
+//!   WebGL2 context on the same canvas instead ([`worker::webgl2`]), creates pipelines without blocking,
+//!   draws a full-screen pass, and posts its state.
 //!
 //! WebGPU is called through `js_sys::Reflect`, not web-sys's WebGPU types, which need the unstable
 //! `web_sys_unstable_apis` cfg in every crate that builds this one.

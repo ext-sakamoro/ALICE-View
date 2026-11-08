@@ -74,6 +74,22 @@ if (mode === "webgpu") {
   check("without WebGPU the worker says why", k.includes("fallback"), JSON.stringify(await said()));
   const why = (await said()).find((m) => m.kind === "fallback")?.reason ?? "";
   check("the reason names what was missing", /no WebGPU|no adapter|no device|no webgpu context/.test(why), why);
+  // and the page is drawn the other way: WebGL2 in the worker, on the same canvas (a known colour, read back from the
+  // screen)
+  for (let i = 0; i < 100 && !(await said()).some((m) => m.kind === "fallback-drawn" || m.kind === "fallback-none"); i++) await page.waitForTimeout(50);
+  check("without WebGPU the worker draws with WebGL2 on the same canvas", (await said()).some((m) => m.kind === "fallback-drawn"), JSON.stringify(await said()));
+  await page.waitForTimeout(200);
+  const box = await page.locator("canvas").boundingBox();
+  const shot = (await page.screenshot({ clip: { x: box.x + box.width / 2, y: box.y + box.height / 2, width: 1, height: 1 } })).toString("base64");
+  const px = await page.evaluate(async (b64) => {
+    const bm = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+    const c = new OffscreenCanvas(1, 1).getContext("2d");
+    c.drawImage(bm, 0, 0);
+    return Array.from(c.getImageData(0, 0, 1, 1).data.slice(0, 3));
+  }, shot);
+  // 0.25, 0.5, 0.75 of 255
+  const want = [64, 128, 191];
+  check("the fallback's colour is on the screen", px.every((v, i) => Math.abs(v - want[i]) <= 2), `${px} (want ${want})`);
 }
 // what the device said of itself: a loss or an error nobody caught is a failure, with its words
 const trouble = (await said()).filter((m) => m.kind === "lost" || m.kind === "uncaptured" || m.kind === "error");
