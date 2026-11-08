@@ -68,9 +68,11 @@ if (mode === "webgpu") {
       console.log(`not measured on this run: the compile took ${Math.round(window)} ms, under the 100 ms that holds several frames`);
       console.log("ASYNC-MEASURED 0");
     } else {
-      // every frame the window holds, but one (a frame may be in flight at either end)
-      const want = Math.floor(window / period) - 1;
-      check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted at ${period.toFixed(1)} ms a frame`);
+      // the property is the gap: no gap over 50 ms. That alone implies at least ceil(window / 50) - 1 frames, so the
+      // count asks for that, not every frame the period would give (one missed vsync on a shared software adapter is
+      // jitter, not a stall)
+      const want = Math.ceil(window / 50) - 1;
+      check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted (no gap over 50 ms), ${period.toFixed(1)} ms a frame`);
       check("no gap over 50 ms between the render thread's frames while it compiled", gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
       console.log("ASYNC-MEASURED 1");
     }
