@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.92"
 license = "LicenseRef-Proprietary"
-description = "A renderer in a Web Worker on an OffscreenCanvas: WebGPU device, pipelines created without blocking, and a state mirror on the page"
+description = "A renderer in a render thread on an OffscreenCanvas: WebGPU device, pipelines created without blocking, and a state mirror on the page"
 publish = false
 
 # its own workspace: it builds without the viewer's native dependencies
@@ -24,7 +24,7 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [features]
-# a page and a worker that exercise the crate in a browser (the checks in probe/ drive them)
+# a page and a render thread that exercise the crate in a browser (the checks in probe/ drive them)
 probe = []
 
 [profile.release]

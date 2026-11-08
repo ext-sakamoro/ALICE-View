@@ -1,4 +1,4 @@
-//! The worker's side: a WebGPU device on the transferred canvas, pipelines that compile without
+//! The render thread's side: a WebGPU device on the transferred canvas, pipelines that compile without
 //! blocking, a full-screen pass, and the state posted to the page each frame.
 
 use js_sys::{Array, Function, Object, Promise, Reflect, Uint8Array};
@@ -11,7 +11,7 @@ use web_sys::{DedicatedWorkerGlobalScope, OffscreenCanvas, WebGl2RenderingContex
 /// `webgpu` context, so [`webgl2`] can still draw on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NoWebGpu {
-    /// `navigator.gpu` is absent (no WebGPU in this browser, or not in workers).
+    /// `navigator.gpu` is absent (no WebGPU in this browser, or not in render threads).
     NoApi,
     /// The browser has WebGPU but gave no adapter: none (blocked GPU, or no GPU), or the request was refused, with its
     /// words.
@@ -96,12 +96,12 @@ pub fn describe(v: &JsValue) -> String {
         .unwrap_or_else(|| String::from("(no message)"))
 }
 
-/// The worker's own scope.
+/// The render thread's own scope.
 ///
 /// # Panics
 ///
-/// When called outside a dedicated worker.
-/// The other way to draw on `canvas` when there is no WebGPU: a WebGL2 context, in the worker, on the same canvas.
+/// When called outside a dedicated render thread.
+/// The other way to draw on `canvas` when there is no WebGPU: a WebGL2 context, in the render thread, on the same canvas.
 /// `None` when the browser has no WebGL2 either, or the canvas already has another context (after
 /// [`NoWebGpu::NoContext`]).
 #[must_use]
@@ -327,7 +327,7 @@ impl Gpu {
     }
 }
 
-/// Post the worker's state for this frame; the page's mirror holds the last one.
+/// Post the render thread's state for this frame; the page's mirror holds the last one.
 ///
 /// # Errors
 ///
@@ -345,7 +345,7 @@ pub fn post(message: &JsValue) -> Result<(), JsValue> {
     scope().post_message(message)
 }
 
-/// Wait `ms` milliseconds on the worker's own clock, whether or not any frame is presented
+/// Wait `ms` milliseconds on the render thread's own clock, whether or not any frame is presented
 pub async fn sleep(ms: i32) {
     let p = Promise::new(&mut |resolve, _| {
         let _ = scope().set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms);
@@ -353,7 +353,7 @@ pub async fn sleep(ms: i32) {
     let _ = JsFuture::from(p).await;
 }
 
-/// The next animation frame of the worker (its own `requestAnimationFrame`, which follows the
+/// The next animation frame of the render thread (its own `requestAnimationFrame`, which follows the
 /// canvas's display).
 pub async fn frame() -> f64 {
     let p = Promise::new(&mut |resolve, _| {

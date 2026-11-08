@@ -1,4 +1,4 @@
-//! A page and a worker that exercise the crate in a real browser: `probe/check.mjs` reads what they
+//! A page and a render thread that exercise the crate in a real browser: `probe/check.mjs` reads what they
 //! report. Not part of what a product links (feature `probe`).
 
 use std::cell::{Cell, RefCell};
@@ -12,7 +12,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, MessageEvent, OffscreenCanvas};
 
 use crate::page::RenderHost;
-use crate::worker::{self, Gpu};
+use crate::render_thread::{self, Gpu};
 
 thread_local! {
     static HOST: RefCell<Option<RenderHost>> = const { RefCell::new(None) };
@@ -71,7 +71,7 @@ fn obj(pairs: &[(&str, JsValue)]) -> Object {
     o
 }
 
-/// The page: hand `#c` to `worker.js`, and keep the mirror readable as `window.__probeMirror()`.
+/// The page: hand `#c` to `render_thread.js`, and keep the mirror readable as `window.__probeMirror()`.
 #[wasm_bindgen]
 pub fn probe_page(steps: u32) -> Result<(), JsValue> {
     let doc = web_sys::window()
@@ -80,7 +80,7 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
     let canvas: HtmlCanvasElement = doc.get_element_by_id("c").ok_or("no #c")?.dyn_into()?;
     let host = RenderHost::start(
         &canvas,
-        "./worker.js",
+        "./render_thread.js",
         &obj(&[("steps", steps.into())]).into(),
     )?;
     let said = Rc::new(RefCell::new(Array::new()));
@@ -89,7 +89,7 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
         let (said, times) = (said.clone(), times.clone());
         host.listen(move |m| {
             match Reflect::get(m, &"state".into()) {
-                // every frame's time, to find the gaps between the worker's frames
+                // every frame's time, to find the gaps between the render thread's frames
                 Ok(s) if !s.is_undefined() => {
                     let _ = Reflect::get(&s, &"t".into()).map(|t| times.borrow().push(&t));
                 }
@@ -118,26 +118,26 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
 }
 
 async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
-    let gpu: Rc<Gpu> = match worker::gpu(&canvas).await {
+    let gpu: Rc<Gpu> = match render_thread::gpu(&canvas).await {
         Ok(g) => Rc::new(g),
         Err(no) => {
-            worker::post(
+            render_thread::post(
                 &obj(&[("kind", "fallback".into()), ("reason", no.words().into())]).into(),
             )?;
             // the other way, on the same canvas: one known colour, which the check reads back from the screen
-            return match worker::webgl2(&canvas) {
+            return match render_thread::webgl2(&canvas) {
                 Some(gl) => {
                     gl.clear_color(0.25, 0.5, 0.75, 1.0);
                     gl.clear(web_sys::WebGl2RenderingContext::COLOR_BUFFER_BIT);
-                    worker::post(&obj(&[("kind", "fallback-drawn".into())]).into())
+                    render_thread::post(&obj(&[("kind", "fallback-drawn".into())]).into())
                 }
-                None => worker::post(&obj(&[("kind", "fallback-none".into())]).into()),
+                None => render_thread::post(&obj(&[("kind", "fallback-none".into())]).into()),
             };
         }
     };
     // what the device says when it is lost or reports an error nobody caught: printed, never silent
     gpu.on_trouble(|kind, text| {
-        let _ = worker::post(&obj(&[("kind", kind.into()), ("error", text.into())]).into());
+        let _ = render_thread::post(&obj(&[("kind", kind.into()), ("error", text.into())]).into());
     });
     let quick = gpu.pipeline(QUICK, "vs", "fs").await?;
     // which adapter: on a machine without a GPU's WebGPU it is a software one, which shows the mechanism, not GPU time
@@ -149,7 +149,7 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
             .unwrap_or_default()
     };
     let adapter = field("vendor") + " " + &field("architecture") + " " + &field("description");
-    worker::post(
+    render_thread::post(
         &obj(&[
             ("kind", "device".into()),
             ("adapter", adapter.trim().into()),
@@ -166,9 +166,9 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
         let (shown, heavy) = (shown.clone(), heavy_done.clone());
         wasm_bindgen_futures::spawn_local(async move {
             for tick in 1..=1200u32 {
-                worker::sleep(16).await;
+                render_thread::sleep(16).await;
                 let (frame, t, asked) = shown.get();
-                let _ = worker::post_state(
+                let _ = render_thread::post_state(
                     &obj(&[
                         ("tick", tick.into()),
                         ("frame", frame.into()),
@@ -182,10 +182,10 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
         });
     }
     loop {
-        let t = worker::frame().await;
+        let t = render_thread::frame().await;
         gpu.draw(&quick, None)?;
         frame += 1;
-        // (steps 0: no slow pipeline, where the adapter cannot make one in a worker)
+        // (steps 0: no slow pipeline, where the adapter cannot make one in a render thread)
         if frame == 10 && steps > 0 {
             // compile a slow pipeline while the quick one keeps drawing
             asked = t;
@@ -194,16 +194,16 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
             wasm_bindgen_futures::spawn_local(async move {
                 let made = shared.pipeline(&wgsl, "vs", "fs").await;
                 if let Err(e) = &made {
-                    let _ = worker::post(
+                    let _ = render_thread::post(
                         &obj(&[
                             ("kind", "heavyError".into()),
-                            ("error", worker::describe(e).into()),
+                            ("error", render_thread::describe(e).into()),
                         ])
                         .into(),
                     );
                 }
                 let ok = made.is_ok();
-                let now = js_sys::Reflect::get(&worker::scope(), &"performance".into())
+                let now = js_sys::Reflect::get(&render_thread::scope(), &"performance".into())
                     .ok()
                     .and_then(|p| js_sys::Reflect::get(&p, &"now".into()).ok().map(|f| (p, f)))
                     .and_then(|(p, f)| {
@@ -222,9 +222,9 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
     }
 }
 
-/// The worker: messages that came before the module was ready are in `queued`.
+/// The render thread: messages that came before the module was ready are in `queued`.
 #[wasm_bindgen]
-pub fn probe_worker(queued: Array) {
+pub fn probe_render_thread(queued: Array) {
     let handle = |data: JsValue| {
         if Reflect::get(&data, &"kind".into())
             .ok()
@@ -242,10 +242,10 @@ pub fn probe_worker(queued: Array) {
                 .unwrap_or(64.0) as u32;
             wasm_bindgen_futures::spawn_local(async move {
                 if let Err(e) = run(canvas, steps).await {
-                    let _ = worker::post(
+                    let _ = render_thread::post(
                         &obj(&[
                             ("kind", "error".into()),
-                            ("error", worker::describe(&e).into()),
+                            ("error", render_thread::describe(&e).into()),
                         ])
                         .into(),
                     );
@@ -259,6 +259,6 @@ pub fn probe_worker(queued: Array) {
     let f = Closure::wrap(
         Box::new(move |e: MessageEvent| handle(e.data())) as Box<dyn FnMut(MessageEvent)>
     );
-    worker::scope().set_onmessage(Some(f.as_ref().unchecked_ref()));
+    render_thread::scope().set_onmessage(Some(f.as_ref().unchecked_ref()));
     f.forget();
 }

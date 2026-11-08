@@ -87,7 +87,7 @@ jobs:
         run: python3 scripts/no_direct_rkyv.py
 
   web:
-    name: Web worker renderer (crates/alice-view-web)
+    name: Render thread renderer (crates/alice-view-web)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -130,7 +130,7 @@ jobs:
           sleep 2
           ln -s "$PWD/node_modules" probe/node_modules
           # the runner's WebGPU is SwiftShader, which loses the device while a second pipeline compiles
-          # asynchronously in a worker (measured with a plain-JS worker too): the async pipeline is measured on a real
+          # asynchronously on a render thread (measured with a plain-JS render thread too): the async pipeline is measured on a real
           # GPU, not here; the device, the mirror, the fallback and the size are
           PROBE_WEBGL=swiftshader PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/gpuinfo.mjs http://127.0.0.1:18802/index.html
           PROBE_ADAPTER=swiftshader PROBE_ASYNC=skip PROBE_CHROME_ARGS="--use-webgpu-adapter=swiftshader" node probe/check.mjs http://127.0.0.1:18802/index.html webgpu

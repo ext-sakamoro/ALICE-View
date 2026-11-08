@@ -1,5 +1,5 @@
-// What the crate claims, in a real browser: a WebGPU device in a worker on the transferred canvas, a slow pipeline
-// compiled while the worker keeps drawing, the page's mirror following the worker's state, and the reason given when
+// What the crate claims, in a real browser: a WebGPU device in a render thread on the transferred canvas, a slow pipeline
+// compiled while the render thread keeps drawing, the page's mirror following the render thread's state, and the reason given when
 // there is no WebGPU.
 //
 //   node probe/check.mjs <url of probe/index.html> <webgpu|none>
@@ -22,9 +22,9 @@ const page = await browser.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-// PROBE_ASYNC=skip: the runner's adapter cannot create a pipeline asynchronously in a worker (SwiftShader in Chromium:
+// PROBE_ASYNC=skip: the runner's adapter cannot create a pipeline asynchronously in a render thread (SwiftShader in Chromium:
 // the device is destroyed while the second createRenderPipelineAsync runs, measured 2026-11-08 with this probe and
-// with a plain-JS worker alike, the device held on the worker's global or not). The async pipeline is then not
+// with a plain-JS render thread alike, the device held on the render thread's global or not). The async pipeline is then not
 // measured here; it is measured on a real GPU
 const skipAsync = process.env.PROBE_ASYNC === "skip";
 await page.goto(`${url}?steps=${skipAsync ? 0 : process.env.PROBE_STEPS ?? 96}`);
@@ -34,7 +34,7 @@ for (let i = 0; i < 300 && !(await kinds()).some((k) => k === "device" || k === 
 const k = await kinds();
 if (mode === "webgpu") {
   const dev = (await said()).find((m) => m.kind === "device");
-  check("a WebGPU device came in the worker, and says its adapter", !!dev && typeof dev.adapter === "string" && dev.adapter.length > 0, JSON.stringify(dev));
+  check("a WebGPU device came in the render thread, and says its adapter", !!dev && typeof dev.adapter === "string" && dev.adapter.length > 0, JSON.stringify(dev));
   // PROBE_ADAPTER: the adapter this lane says it measures; another one fails (a lane must not measure what it does not name)
   if (process.env.PROBE_ADAPTER) check(`the adapter is the one this lane names (${process.env.PROBE_ADAPTER})`, !!dev && dev.adapter.toLowerCase().includes(process.env.PROBE_ADAPTER.toLowerCase()), dev ? dev.adapter : "none");
   let m = null;
@@ -54,30 +54,30 @@ if (mode === "webgpu") {
     const t = [...new Set(await page.evaluate(() => window.__probeTimes()))];
     const during = [];
     for (let i = 1; i < t.length; i++) if (t[i - 1] >= m.asked && t[i] <= m.heavy + 100) during.push(t[i] - t[i - 1]);
-    check("the worker drew frames while it compiled", during.length >= 3, `${during.length} frames over ${Math.round(m.heavy - m.asked)} ms`);
+    check("the render thread drew frames while it compiled", during.length >= 3, `${during.length} frames over ${Math.round(m.heavy - m.asked)} ms`);
     const gap = Math.max(0, ...during);
-    console.log(`compile ${Math.round(m.heavy - m.asked)} ms, longest gap between the worker's frames meanwhile ${Math.round(gap)} ms`);
+    console.log(`compile ${Math.round(m.heavy - m.asked)} ms, longest gap between the render thread's frames meanwhile ${Math.round(gap)} ms`);
     // (only when there were frames to measure: no frames is not "no gap")
-    check("no gap over 50 ms between the worker's frames while it compiled", during.length >= 3 && gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
+    check("no gap over 50 ms between the render thread's frames while it compiled", during.length >= 3 && gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
   }
-  // the mirror is the last state the worker posted: read twice a frame apart, it moves on, and it is a plain read
-  // the worker's beat, not its frames: the mirror moves whether or not the GPU draws
+  // the mirror is the last state the render thread posted: read twice a frame apart, it moves on, and it is a plain read
+  // the render thread's beat, not its frames: the mirror moves whether or not the GPU draws
   const a = await page.evaluate(() => { const x = window.__probeMirror(); return { tick: x.tick, sync: typeof x === "object" }; });
   await page.waitForTimeout(200);
   const b = await page.evaluate(() => window.__probeMirror().tick);
-  check("the mirror is read at once and follows the worker", a.sync && b > a.tick, `${a.tick} -> ${b}`);
+  check("the mirror is read at once and follows the render thread", a.sync && b > a.tick, `${a.tick} -> ${b}`);
   const pt = await page.evaluate(() => window.__pageTimes);
   let pg = 0;
   for (let i = 1; i < pt.length; i++) if (pt[i - 1] >= m.asked) pg = Math.max(pg, pt[i] - pt[i - 1]);
   console.log(`longest gap between the page's frames after the slow pipeline was asked: ${Math.round(pg)} ms`);
 } else {
-  check("without WebGPU the worker says why", k.includes("fallback"), JSON.stringify(await said()));
+  check("without WebGPU the render thread says why", k.includes("fallback"), JSON.stringify(await said()));
   const why = (await said()).find((m) => m.kind === "fallback")?.reason ?? "";
   check("the reason names what was missing", /no WebGPU|no adapter|no device|no webgpu context/.test(why), why);
-  // and the page is drawn the other way: WebGL2 in the worker, on the same canvas (a known colour, read back from the
+  // and the page is drawn the other way: WebGL2 in the render thread, on the same canvas (a known colour, read back from the
   // screen)
   for (let i = 0; i < 100 && !(await said()).some((m) => m.kind === "fallback-drawn" || m.kind === "fallback-none"); i++) await page.waitForTimeout(50);
-  check("without WebGPU the worker draws with WebGL2 on the same canvas", (await said()).some((m) => m.kind === "fallback-drawn"), JSON.stringify(await said()));
+  check("without WebGPU the render thread draws with WebGL2 on the same canvas", (await said()).some((m) => m.kind === "fallback-drawn"), JSON.stringify(await said()));
   await page.waitForTimeout(200);
   const box = await page.locator("canvas").boundingBox();
   const shot = (await page.screenshot({ clip: { x: box.x + box.width / 2, y: box.y + box.height / 2, width: 1, height: 1 } })).toString("base64");
