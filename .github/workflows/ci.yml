@@ -158,12 +158,18 @@ jobs:
           PROBE_WEBGL=llvmpipe PROBE_CHROME_ARGS="$flags" node probe/gpuinfo.mjs http://127.0.0.1:18803/index.html
           failed=0
           for i in $(seq 1 20); do
-            PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="$flags" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu > "/tmp/lane-$i.txt" 2>&1 || failed=$((failed + 1))
+            # 512 steps: at the default 96 this software adapter compiles the slow pipeline in 30-50 ms, too short to
+            # hold the frames the check counts (a run under 100 ms is "not measured")
+            PROBE_STEPS=512 PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="$flags" node probe/check.mjs http://127.0.0.1:18803/index.html webgpu > "/tmp/lane-$i.txt" 2>&1 || failed=$((failed + 1))
           done
           tail -12 /tmp/lane-1.txt
           echo "software WebGPU over Mesa Vulkan: $failed of 20 runs failed"
           for i in $(seq 1 20); do grep -h FAIL "/tmp/lane-$i.txt" || true; done | sort | uniq -c
+          # a run whose compile was too short to hold frames does not measure the async pipeline: some must have
+          measured=$(cat /tmp/lane-*.txt | grep -c '^ASYNC-MEASURED 1' || true)
+          echo "the async pipeline measured in $measured of 20 runs"
           test "$failed" -eq 0
+          test "$measured" -gt 0
 
   actionlint:
     name: actionlint (workflow YAML 検証)

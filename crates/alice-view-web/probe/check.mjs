@@ -54,11 +54,26 @@ if (mode === "webgpu") {
     const t = [...new Set(await page.evaluate(() => window.__probeTimes()))];
     const during = [];
     for (let i = 1; i < t.length; i++) if (t[i - 1] >= m.asked && t[i] <= m.heavy + 100) during.push(t[i] - t[i - 1]);
-    check("the render thread drew frames while it compiled", during.length >= 3, `${during.length} frames over ${Math.round(m.heavy - m.asked)} ms`);
+    // the frame period before the ask (the median of those intervals): what "a frame" is on this runner
+    const before = [];
+    for (let i = 1; i < t.length; i++) if (t[i] < m.asked) before.push(t[i] - t[i - 1]);
+    before.sort((x, y) => x - y);
+    const period = before.length ? before[Math.floor(before.length / 2)] : NaN;
+    const window = m.heavy - m.asked;
     const gap = Math.max(0, ...during);
-    console.log(`compile ${Math.round(m.heavy - m.asked)} ms, longest gap between the render thread's frames meanwhile ${Math.round(gap)} ms`);
-    // (only when there were frames to measure: no frames is not "no gap")
-    check("no gap over 50 ms between the render thread's frames while it compiled", during.length >= 3 && gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
+    console.log(`compile ${Math.round(window)} ms, frame period ${period.toFixed(1)} ms, ${during.length} frames meanwhile, longest gap ${Math.round(gap)} ms`);
+    // a compile shorter than a few frames cannot show whether frames went on during it: not measured (not passed);
+    // the CI lane requires some of its runs to have measured (ASYNC-MEASURED 1)
+    if (window < 100 || !(period > 0)) {
+      console.log(`not measured on this run: the compile took ${Math.round(window)} ms, under the 100 ms that holds several frames`);
+      console.log("ASYNC-MEASURED 0");
+    } else {
+      // every frame the window holds, but one (a frame may be in flight at either end)
+      const want = Math.floor(window / period) - 1;
+      check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted at ${period.toFixed(1)} ms a frame`);
+      check("no gap over 50 ms between the render thread's frames while it compiled", gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
+      console.log("ASYNC-MEASURED 1");
+    }
   }
   // the mirror is the last state the render thread posted: read twice a frame apart, it moves on, and it is a plain read
   // the render thread's beat, not its frames: the mirror moves whether or not the GPU draws
