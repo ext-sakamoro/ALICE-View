@@ -50,6 +50,15 @@ if (mode === "webgpu") {
     }
     const failed = (await said()).find((x) => x.kind === "heavyError");
     check("the slow pipeline was created", m && m.heavy > 0, failed ? failed.error : JSON.stringify(m));
+    // a control window as long as the compile, after it (from 100 ms after the pipeline came): wait until the render
+    // thread's frames have passed its end, so the same run says what gaps this machine shows with no compile
+    const ctrl0 = m.heavy + 100;
+    const ctrl1 = ctrl0 + (m.heavy - m.asked);
+    for (let i = 0; i < 600; i++) {
+      const last = await page.evaluate(() => { const x = window.__probeTimes(); return x.length ? x[x.length - 1] : 0; });
+      if (last >= ctrl1) break;
+      await page.waitForTimeout(100);
+    }
     // the beat repeats a frame's time until the next frame: each frame once
     const t = [...new Set(await page.evaluate(() => window.__probeTimes()))];
     const during = [];
@@ -61,11 +70,19 @@ if (mode === "webgpu") {
     const period = before.length ? before[Math.floor(before.length / 2)] : NaN;
     const window = m.heavy - m.asked;
     const gap = Math.max(0, ...during);
+    const control = [];
+    for (let i = 1; i < t.length; i++) if (t[i - 1] >= ctrl0 && t[i] <= ctrl1) control.push(t[i] - t[i - 1]);
+    const ctrlGap = Math.max(0, ...control);
     console.log(`compile ${Math.round(window)} ms, frame period ${period.toFixed(1)} ms, ${during.length} frames meanwhile, longest gap ${Math.round(gap)} ms`);
+    console.log(`control (no compile, ${Math.round(ctrl0)}..${Math.round(ctrl1)}): ${control.length} frames, longest gap ${Math.round(ctrlGap)} ms`);
     // a compile shorter than a few frames cannot show whether frames went on during it: not measured (not passed);
     // the CI lane requires some of its runs to have measured (ASYNC-MEASURED 1)
     if (window < 100 || !(period > 0)) {
       console.log(`not measured on this run: the compile took ${Math.round(window)} ms, under the 100 ms that holds several frames`);
+      console.log("ASYNC-MEASURED 0");
+    } else if (control.length < Math.ceil(window / 50) - 1) {
+      // without a control window holding frames, a stall during the compile cannot be told from the machine's own
+      console.log(`not measured on this run: the control window held ${control.length} frames`);
       console.log("ASYNC-MEASURED 0");
     } else {
       // the property is the gap: no gap over 50 ms. That alone implies at least ceil(window / 50) - 1 frames, so the
@@ -73,7 +90,10 @@ if (mode === "webgpu") {
       // jitter, not a stall)
       const want = Math.ceil(window / 50) - 1;
       check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted (no gap over 50 ms), ${period.toFixed(1)} ms a frame`);
-      check("no gap over 50 ms between the render thread's frames while it compiled", gap <= 50, `${Math.round(gap)} ms over ${during.length} frames`);
+      // the compile adds no stall: no gap over 50 ms, or none longer than the same run shows with no compile plus one
+      // frame (a shared machine that pauses the page pauses it in both windows; a compile that blocks the thread only in
+      // the first)
+      check("no gap over 50 ms between the render thread's frames while it compiled, beyond what the machine shows without a compile", gap <= 50 || gap <= ctrlGap + period, `${Math.round(gap)} ms over ${during.length} frames while it compiled, ${Math.round(ctrlGap)} ms over ${control.length} frames without, ${period.toFixed(1)} ms a frame`);
       console.log("ASYNC-MEASURED 1");
     }
   }

@@ -165,6 +165,8 @@ jobs:
           tail -12 /tmp/lane-1.txt
           echo "software WebGPU over Mesa Vulkan: $failed of 20 runs failed"
           for i in $(seq 1 20); do grep -h FAIL "/tmp/lane-$i.txt" || true; done | sort | uniq -c
+          # every run's gap while compiling and in its control window with no compile, side by side
+          for i in $(seq 1 20); do echo "run $i: $(grep -h '^compile ' "/tmp/lane-$i.txt" | cut -d, -f4) | $(grep -h '^control ' "/tmp/lane-$i.txt" | cut -d: -f2)"; done
           # a run whose compile was too short to hold frames does not measure the async pipeline
           measured=$(cat /tmp/lane-*.txt | grep -c '^ASYNC-MEASURED 1' || true)
           echo "the async pipeline measured in $measured of 20 runs"
