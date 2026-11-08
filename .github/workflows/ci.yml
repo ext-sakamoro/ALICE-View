@@ -174,11 +174,14 @@ jobs:
           # most runs must measure: 512 steps measured 20 of 20 on this runner
           test "$measured" -ge 10
           # a stall is a gap over 50 ms (each measured run says its own). A compile that blocks the thread stalls most
-          # runs while the control windows do not; the machine pausing the page now and then shows in both counts
+          # runs (stall_c near 20, stall_n near 0); the machine pausing the page now and then shows in both counts. The
+          # margin is derived from the rate seen on this lane, about 1 chance stall in 20 runs: stall_c and stall_n are
+          # then each Poisson(1), their difference Skellam(1, 1), and a lane with no blocking compile goes red when the
+          # difference exceeds the margin: P(D > 1) = 13.0 %, P(D > 2) = 3.7 %, P(D > 3) = 0.84 %. Margin 3
           stall_c=$(cat /tmp/lane-*.txt | grep -c '^STALL compile' || true)
           stall_n=$(cat /tmp/lane-*.txt | grep -c '^STALL control' || true)
           echo "stalls over 50 ms: $stall_c of $measured runs while compiling, $stall_n without a compile"
-          test "$stall_c" -le $((stall_n + 1))
+          test "$stall_c" -le $((stall_n + 3))
 
   actionlint:
     name: actionlint (workflow YAML 検証)

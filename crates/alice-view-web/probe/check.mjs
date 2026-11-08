@@ -92,7 +92,7 @@ if (mode === "webgpu") {
       check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted (no gap over 50 ms), ${period.toFixed(1)} ms a frame`);
       // a stall is a gap over 50 ms. One run cannot tell a compile that blocks the thread from the machine pausing the
       // page (a rare, independent event that seldom hits both windows of one run), so each run says its stalls and the
-      // lane counts them over its runs: the compile's stalls may exceed the control window's by at most one
+      // lane counts them over its runs: the compile's stalls may exceed the control window's by at most three (ci.yml derives the margin)
       if (gap > 50) console.log(`STALL compile ${Math.round(gap)} ms`);
       if (ctrlGap > 50) console.log(`STALL control ${Math.round(ctrlGap)} ms`);
       if (!process.env.PROBE_LANE_COUNTS_STALLS) check("no gap over 50 ms between the render thread's frames while it compiled", gap <= 50, `${Math.round(gap)} ms over ${during.length} frames while it compiled, ${Math.round(ctrlGap)} ms over ${control.length} frames without`);
