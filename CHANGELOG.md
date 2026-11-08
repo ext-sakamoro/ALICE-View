@@ -26,6 +26,7 @@ All notable changes to ALICE-View are documented here.
 - `.github/actions/alice-stubs` が stub の版と feature を literal で書くのをやめ、`.github/make-stubs.py --allow-stub-all` に委譲するようにした これで版の出所は `Cargo.toml` 1 箇所になる (従来は `ci.yml` が導出、本 action が literal で、要求を動かすたびに 2 箇所の同期が要った) `--allow-stub-all` は「消費側の lib を既定 feature で compile しない job」(cargo audit / deny / semver-checks / fuzz) 専用で、flag を付けなければ従来どおり compile される dep への stub を拒否する
 - `make-stubs.py` が `[features]` 表の `<dep>/<feat>` 記法 (`db = ["dep:alice-db", "alice-db/fs"]`) を stub の feature として拾うようにした 拾わないと `depends on alice-db with feature fs but alice-db does not have that feature` で resolve 段から落ちる
 - `alice-sdf` の要求を `4.0` から `5.0` に上げた (5.0 で変わった API の利用は無く、code の変更は無い)
+- CI: 公開する文面の検査 (`Public text` workflow、`scripts/public_text.sh`) を追加 ALICE-Law の `scripts/public_text_check.py` を `.github/public-text-pin` の revision で取得し、SHA-256 が一致した時だけ使って、HEAD の全 tracked file (path と本文) と送った commit (message・追加行・追加 path) を読む 何も比較できなければ失敗する preflight でも走る
 
 ### Fixed
 - `semver-checks` の基準が、自分の `Cargo.toml` の要求を満たさない sibling に当たって解決できなかった (基準の `alice-db = "0.4"` に対し sibling は 0.5.0 で、比較の前に `failed to select a version` で止まる) 基準の checkout にだけ、sibling が要求を満たさなくなった path 依存の `path` を外し、その要求を registry から解決する (`.github/semver_gate.py relax`) registry に無い版なら解決で失敗し、比較 0 件として fail のままである 試験 `Relax` を `.github/test_semver_gate.py` に足した
