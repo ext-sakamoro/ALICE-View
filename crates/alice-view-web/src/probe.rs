@@ -220,8 +220,11 @@ async fn run(canvas: OffscreenCanvas, steps: u32, hold: u32) -> Result<(), JsVal
                 let ok = made.is_ok();
                 done.set(if ok { now() } else { -2.0 });
             });
-            if hold > 0 {
-                let until = now() + f64::from(hold);
+            // a clock that cannot be read (0) would never reach `until`: the hold is then skipped, and the lane that
+            // asked for it finds no stall and fails, instead of the render thread spinning until the step times out
+            let start = now();
+            if hold > 0 && start > 0.0 {
+                let until = start + f64::from(hold);
                 while now() < until {}
             }
         }
