@@ -580,10 +580,12 @@ has_toolchain() { grep -q "^$1" <<<"$(rustup toolchain list)"; }
 
 # Steps CI runs that this file cannot reproduce locally (they can only fail remotely):
 #   - ci.yml:web:Install wasm-bindgen-cli (needs network / runner-only)
+#   - ci.yml:web:Stall rule (unit tests) (no cargo / grep)
 #   - ci.yml:web: uses actions/setup-node@v5 (an action this file cannot run)
 #   - ci.yml:web:Browser checks (SwiftShader WebGPU, then none) (no cargo / grep)
 #   - ci.yml:web:Install Mesa software Vulkan (lavapipe) (needs network / runner-only)
 #   - ci.yml:web:Browser checks on software WebGPU over Mesa Vulkan (20 runs) (needs network / runner-only)
+#   - ci.yml:web:Stall gate catches a held render thread (4 runs, PROBE_HOLD_MS=2000) (needs network / runner-only)
 #   - security-audit.yml:changes:decide (reads AFTER, BEFORE, CREATED, EVENT, FORCED, PR_BASE, PR_HEAD, a value only the runner has)
 #   - security-audit.yml:audit:Install cargo-audit (needs network / runner-only)
 #   - security-audit.yml:deny:Install cargo-deny (needs network / runner-only)

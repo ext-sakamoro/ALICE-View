@@ -9,5 +9,6 @@
   const tick = (t) => { window.__pageTimes.push(t); requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   await init();
-  probe_page(Number(new URLSearchParams(location.search).get("steps") || 64));
+  const q = new URLSearchParams(location.search);
+  probe_page(Number(q.get("steps") || 64), Number(q.get("hold") || 0));
 </script>

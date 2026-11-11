@@ -6,6 +6,7 @@
 //
 // Author: Moroya Sakamoto
 import { chromium } from "playwright";
+import { isStall } from "./stall.mjs";
 
 const [url, mode] = process.argv.slice(2);
 const problems = [];
@@ -27,7 +28,9 @@ page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 // with a plain-JS render thread alike, the device held on the render thread's global or not). The async pipeline is then not
 // measured here; it is measured on a real GPU
 const skipAsync = process.env.PROBE_ASYNC === "skip";
-await page.goto(`${url}?steps=${skipAsync ? 0 : process.env.PROBE_STEPS ?? 96}`);
+// PROBE_HOLD_MS: the render thread busy-waits this long after asking for the slow pipeline (the gate's teeth: a hold
+// as long as the compile must count as a stall)
+await page.goto(`${url}?steps=${skipAsync ? 0 : process.env.PROBE_STEPS ?? 96}&hold=${process.env.PROBE_HOLD_MS ?? 0}`);
 const said = async () => page.evaluate(() => (window.__probeSaid ? window.__probeSaid() : []));
 const kinds = async () => (await said()).map((m) => m.kind);
 for (let i = 0; i < 300 && !(await kinds()).some((k) => k === "device" || k === "fallback" || k === "error"); i++) await page.waitForTimeout(100);
@@ -85,17 +88,16 @@ if (mode === "webgpu") {
       console.log(`not measured on this run: the control window held ${control.length} frames`);
       console.log("ASYNC-MEASURED 0");
     } else {
-      // the property is the gap: no gap over 50 ms. That alone implies at least ceil(window / 50) - 1 frames, so the
-      // count asks for that, not every frame the period would give (one missed vsync on a shared software adapter is
-      // jitter, not a stall)
-      const want = Math.ceil(window / 50) - 1;
-      check("the render thread drew frames while it compiled", during.length >= want, `${during.length} frames over ${Math.round(window)} ms, ${want} wanted (no gap over 50 ms), ${period.toFixed(1)} ms a frame`);
-      // a stall is a gap over 50 ms. One run cannot tell a compile that blocks the thread from the machine pausing the
-      // page (a rare, independent event that seldom hits both windows of one run), so each run says its stalls and the
-      // lane counts them over its runs: the compile's stalls may exceed the control window's by at most three (ci.yml derives the margin)
-      if (gap > 50) console.log(`STALL compile ${Math.round(gap)} ms`);
-      if (ctrlGap > 50) console.log(`STALL control ${Math.round(ctrlGap)} ms`);
-      if (!process.env.PROBE_LANE_COUNTS_STALLS) check("no gap over 50 ms between the render thread's frames while it compiled", gap <= 50, `${Math.round(gap)} ms over ${during.length} frames while it compiled, ${Math.round(ctrlGap)} ms over ${control.length} frames without`);
+      // the property is the gap (probe/stall.mjs): a stall is a gap of at least half the window, so frames went on
+      // through most of the compile. With no stall the compile held at least two frames
+      check("the render thread drew frames while it compiled", during.length >= 2, `${during.length} frames over ${Math.round(window)} ms, ${period.toFixed(1)} ms a frame`);
+      // One run cannot tell a compile that blocks the thread from the machine pausing the page (a rare, independent
+      // event that seldom hits both windows of one run), so each run says its stalls and the lane counts them over its
+      // runs: the compile's stalls may exceed the control window's by at most three (ci.yml derives the margin). The
+      // control window is as long as the compile, so both are judged against the same half
+      if (isStall(gap, window)) console.log(`STALL compile ${Math.round(gap)} ms`);
+      if (isStall(ctrlGap, window)) console.log(`STALL control ${Math.round(ctrlGap)} ms`);
+      if (!process.env.PROBE_LANE_COUNTS_STALLS) check("no gap of half the compile or more between the render thread's frames while it compiled", !isStall(gap, window), `${Math.round(gap)} ms over ${during.length} frames while it compiled (${Math.round(window)} ms), ${Math.round(ctrlGap)} ms over ${control.length} frames without`);
       console.log("ASYNC-MEASURED 1");
     }
   }

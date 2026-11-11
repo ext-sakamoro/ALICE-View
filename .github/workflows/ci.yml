@@ -105,6 +105,9 @@ jobs:
           v=$(cargo metadata --format-version 1 | python3 -c "import json,sys; print(next(p['version'] for p in json.load(sys.stdin)['packages'] if p['name'] == 'wasm-bindgen'))")
           cargo install wasm-bindgen-cli --version "$v" --locked
 
+      - name: Stall rule (unit tests)
+        run: node --test probe/stall.test.mjs
+
       - name: Size gate
         run: python3 probe/size.py
 
@@ -163,15 +166,33 @@ jobs:
           test "$failed" -eq 0
           # most runs must measure: 512 steps measured 20 of 20 on this runner
           test "$measured" -ge 10
-          # a stall is a gap over 50 ms (each measured run says its own). A compile that blocks the thread stalls most
-          # runs (stall_c near 20, stall_n near 0); the machine pausing the page now and then shows in both counts. The
-          # margin is derived from the rate seen on this lane, about 1 chance stall in 20 runs: stall_c and stall_n are
+          # a stall is a gap of at least half the compile (probe/stall.mjs; each measured run says its own). A compile
+          # that blocks the thread stalls most runs (stall_c near 20, stall_n near 0); the machine pausing the page now
+          # and then shows in both counts. The margin assumes about 1 chance stall in 20 runs: stall_c and stall_n are
           # then each Poisson(1), their difference Skellam(1, 1), and a lane with no blocking compile goes red when the
           # difference exceeds the margin: P(D > 1) = 13.0 %, P(D > 2) = 3.7 %, P(D > 3) = 0.84 %. Margin 3
           stall_c=$(cat /tmp/lane-*.txt | grep -c '^STALL compile' || true)
           stall_n=$(cat /tmp/lane-*.txt | grep -c '^STALL control' || true)
-          echo "stalls over 50 ms: $stall_c of $measured runs while compiling, $stall_n without a compile"
+          echo "stalls (a gap of half the compile or more): $stall_c of $measured runs while compiling, $stall_n without a compile"
           test "$stall_c" -le $((stall_n + 3))
+
+      # the gate's teeth: the render thread holds itself for 2000 ms after asking for the slow pipeline (longer than any
+      # compile on this lane), as a compile that blocked it would; every run that measures must count a stall, and at
+      # least 3 of the 4 must measure (the gate above would then be red)
+      - name: Stall gate catches a held render thread (4 runs, PROBE_HOLD_MS=2000)
+        run: |
+          python3 -m http.server -d probe 18804 --bind 127.0.0.1 &
+          sleep 2
+          flags="--use-angle=vulkan --ignore-gpu-blocklist --disable-gpu-sandbox --disable-vulkan-surface"
+          for i in $(seq 1 4); do
+            PROBE_HOLD_MS=2000 PROBE_LANE_COUNTS_STALLS=1 PROBE_STEPS=512 PROBE_ADAPTER=swiftshader PROBE_CHROME_ARGS="$flags" node probe/check.mjs http://127.0.0.1:18804/index.html webgpu > "/tmp/held-$i.txt" 2>&1 || true
+            grep -h '^compile \|^STALL\|^ASYNC-MEASURED' "/tmp/held-$i.txt" || true
+          done
+          measured=$(cat /tmp/held-*.txt | grep -c '^ASYNC-MEASURED 1' || true)
+          held=$(cat /tmp/held-*.txt | grep -c '^STALL compile' || true)
+          echo "held render thread: $held stalls in $measured measured runs of 4"
+          test "$measured" -ge 3
+          test "$held" -eq "$measured"
 
   actionlint:
     name: actionlint (workflow YAML 検証)

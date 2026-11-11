@@ -73,7 +73,7 @@ fn obj(pairs: &[(&str, JsValue)]) -> Object {
 
 /// The page: hand `#c` to `render_thread.js`, and keep the mirror readable as `window.__probeMirror()`.
 #[wasm_bindgen]
-pub fn probe_page(steps: u32) -> Result<(), JsValue> {
+pub fn probe_page(steps: u32, hold: u32) -> Result<(), JsValue> {
     let doc = web_sys::window()
         .and_then(|w| w.document())
         .ok_or("no document")?;
@@ -81,7 +81,7 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
     let host = RenderHost::start(
         &canvas,
         "./render_thread.js",
-        &obj(&[("steps", steps.into())]).into(),
+        &obj(&[("steps", steps.into()), ("hold", hold.into())]).into(),
     )?;
     let said = Rc::new(RefCell::new(Array::new()));
     let times = Rc::new(RefCell::new(Array::new()));
@@ -117,7 +117,22 @@ pub fn probe_page(steps: u32) -> Result<(), JsValue> {
     Ok(())
 }
 
-async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
+/// The render thread's clock (`performance.now()`), 0 when it cannot be read
+fn now() -> f64 {
+    js_sys::Reflect::get(&render_thread::scope(), &"performance".into())
+        .ok()
+        .and_then(|p| js_sys::Reflect::get(&p, &"now".into()).ok().map(|f| (p, f)))
+        .and_then(|(p, f)| {
+            f.dyn_ref::<js_sys::Function>()
+                .and_then(|f| f.call0(&p).ok())
+        })
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0)
+}
+
+/// `hold` (ms, 0 = none): after asking for the slow pipeline, the render thread busy-waits this long, as a compile
+/// that blocked the thread would; the check's teeth (the stall gate must go red), never set in a product
+async fn run(canvas: OffscreenCanvas, steps: u32, hold: u32) -> Result<(), JsValue> {
     let gpu: Rc<Gpu> = match render_thread::gpu(&canvas).await {
         Ok(g) => Rc::new(g),
         Err(no) => {
@@ -203,17 +218,12 @@ async fn run(canvas: OffscreenCanvas, steps: u32) -> Result<(), JsValue> {
                     );
                 }
                 let ok = made.is_ok();
-                let now = js_sys::Reflect::get(&render_thread::scope(), &"performance".into())
-                    .ok()
-                    .and_then(|p| js_sys::Reflect::get(&p, &"now".into()).ok().map(|f| (p, f)))
-                    .and_then(|(p, f)| {
-                        f.dyn_ref::<js_sys::Function>()
-                            .and_then(|f| f.call0(&p).ok())
-                    })
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
-                done.set(if ok { now } else { -2.0 });
+                done.set(if ok { now() } else { -2.0 });
             });
+            if hold > 0 {
+                let until = now() + f64::from(hold);
+                while now() < until {}
+            }
         }
         shown.set((frame, t, asked));
         if frame > 600 {
@@ -240,8 +250,13 @@ pub fn probe_render_thread(queued: Array) {
                 .ok()
                 .and_then(|v| v.as_f64())
                 .unwrap_or(64.0) as u32;
+            let hold = Reflect::get(&data, &"init".into())
+                .and_then(|i| Reflect::get(&i, &"hold".into()))
+                .ok()
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0) as u32;
             wasm_bindgen_futures::spawn_local(async move {
-                if let Err(e) = run(canvas, steps).await {
+                if let Err(e) = run(canvas, steps, hold).await {
                     let _ = render_thread::post(
                         &obj(&[
                             ("kind", "error".into()),
