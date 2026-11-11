@@ -143,13 +143,61 @@ def decide(log: str, rc: int) -> tuple[bool, str]:
     return False, f"{change}: cargo-semver-checks failed (exit {rc}) after {n} checks"
 
 
-def _stubs():
-    """make-stubs.py (its file name has a hyphen) for its version-requirement parser"""
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("make_stubs", Path(__file__).with_name("make-stubs.py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+# version requirements: caret / tilde / exact, or a comparison range such as `>=0.4.1, <0.6`
+SIMPLE_REQ = re.compile(r"^(\^|~|=)?(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
+CMP_REQ = re.compile(r"^(>=|>|<=|<)\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
+
+
+def _triple(m: re.Match) -> list[int]:
+    return [int(m.group(i)) if m.group(i) else 0 for i in (2, 3, 4)]
+
+
+def parse_range(req: str) -> list[tuple[str, list[int]]] | None:
+    """`>=a.b.c, <x.y.z` 形式の範囲を (演算子, 3 桁) の列にする 範囲でなければ None"""
+    out = []
+    for p in (p.strip() for p in req.split(",")):
+        m = CMP_REQ.match(p)
+        if not m:
+            return None
+        out.append((m.group(1), _triple(m)))
+    return out
+DEP_SECTION = re.compile(r"(?:^|\.)(?:dependencies|dev-dependencies|build-dependencies)$")
+
+
+def satisfies(version: str, req: str) -> bool:
+    """`version` が要求 `req` を満たすか (caret / tilde / exact のみ)"""
+    rng = parse_range(req.strip())
+    if rng is not None:
+        got = [int(x) for x in re.split(r"[.\-+]", version)[:3]]
+        got += [0] * (3 - len(got))
+        ops = {">=": lambda a, b: a >= b, ">": lambda a, b: a > b,
+               "<=": lambda a, b: a <= b, "<": lambda a, b: a < b}
+        return all(ops[op](got, t) for op, t in rng)
+    m = SIMPLE_REQ.match(req.strip())
+    if not m:
+        return True  # 下限を出す側で loud fail 済
+    op = m.group(1) or "^"
+    want = [int(m.group(i)) if m.group(i) else None for i in (2, 3, 4)]
+    got = [int(x) for x in re.split(r"[.\-+]", version)[:3]]
+    got += [0] * (3 - len(got))
+    lo = [want[i] or 0 for i in range(3)]
+    if got < lo:
+        return False
+    if op == "=":
+        return got[: len([w for w in want if w is not None])] == [
+            w for w in want if w is not None]
+    if op == "~":
+        # `~1.1` は >=1.1.0, <1.2.0 / `~1` は >=1.0.0, <2.0.0
+        if want[1] is None:
+            return got[0] == want[0]
+        return got[0] == want[0] and got[1] == want[1]
+    # caret 0 は左端の非 0 成分で上限が決まる
+    if want[0] != 0:
+        return got[0] == want[0]
+    if (want[1] or 0) != 0:
+        return got[0] == 0 and got[1] == want[1]
+    return got[0] == 0 and got[1] == 0
+
 
 
 PATH_DEP_RE = re.compile(r'^(\s*[A-Za-z0-9_-]+\s*=\s*\{[^}\n]*?)\bpath\s*=\s*"([^"]+)"\s*,?\s*([^}\n]*\}.*)$')
@@ -159,14 +207,13 @@ VERSION_RE = re.compile(r'\bversion\s*=\s*"([^"]+)"')
 def relax_baseline(base_dir: Path) -> list[str]:
     """Make the baseline resolve from what its own Cargo.toml requires.
 
-    The baseline is an older commit checked out next to the sibling repositories, which are at their
-    current version. A path dependency whose sibling has since moved past the baseline's requirement
-    (alice-db "0.4" against a sibling at 0.5.0) cannot be selected, and cargo stops before any
-    comparison. For exactly those dependencies the `path` is dropped, so the requirement is resolved
-    from the registry as it was when the baseline was written; a version the registry does not have
-    still fails the run (the job then reports it compared nothing). Dependencies whose sibling
-    satisfies the requirement keep their path. Returns one line per dependency changed."""
-    stubs = _stubs()
+    The baseline is an older commit, from when the ALICE crates were path dependencies on sibling
+    checkouts. This repository now takes them by git, so no sibling is checked out next to the
+    baseline: a path dependency whose sibling is absent loses its `path` and is resolved from the
+    registry at the requirement the baseline wrote. So does one whose sibling is present but has moved
+    past that requirement (alice-db "0.4" against a sibling at 0.5.0). A version the registry does not
+    have still fails the run (the job then reports it compared nothing). A dependency whose sibling is
+    present and satisfies the requirement keeps its path. Returns one line per dependency changed."""
     toml = base_dir / "Cargo.toml"
     out, changed = [], []
     for line in toml.read_text(encoding="utf-8").splitlines(keepends=True):
@@ -174,13 +221,18 @@ def relax_baseline(base_dir: Path) -> list[str]:
         v = VERSION_RE.search(line) if m else None
         if m and v:
             sib = (base_dir / m.group(2) / "Cargo.toml")
-            if sib.is_file():
+            reason = None
+            if not sib.is_file():
+                reason = "no sibling checkout"
+            else:
                 sib_ver = tomllib.loads(sib.read_text(encoding="utf-8"))["package"]["version"]
-                if not stubs.satisfies(sib_ver, v.group(1)):
-                    name = line.split("=", 1)[0].strip()
-                    line = m.group(1) + m.group(3).lstrip() + "\n"
-                    line = re.sub(r",\s*,", ",", line).replace("{ ,", "{ ").replace(", }", " }")
-                    changed.append(f"{name} {v.group(1)}: the sibling is {sib_ver}, resolved from the registry")
+                if not satisfies(sib_ver, v.group(1)):
+                    reason = f"the sibling is {sib_ver}"
+            if reason is not None:
+                name = line.split("=", 1)[0].strip()
+                line = m.group(1) + m.group(3).lstrip() + "\n"
+                line = re.sub(r",\s*,", ",", line).replace("{ ,", "{ ").replace(", }", " }")
+                changed.append(f"{name} {v.group(1)}: {reason}, resolved from the registry")
         out.append(line)
     toml.write_text("".join(out), encoding="utf-8")
     return changed

@@ -242,9 +242,9 @@ ALICE-View connects to other ALICE ecosystem crates via feature-gated bridge mod
 | Bridge | Feature | Target Crate | Description |
 |--------|---------|--------------|-------------|
 | LOL loader | `lol` (default) | [ALICE-LOL](https://github.com/ext-sakamoro/ALICE-LOL) | `.lol` DSL file loading via `runtime_parser::parse_lol()` |
-| `analytics_bridge` | `analytics` | [ALICE-Analytics](../ALICE-Analytics) | Real-time rendering performance analytics |
-| `physics_bridge` | `physics` | [ALICE-Physics](../ALICE-Physics) | Interactive physics debug overlay visualization |
-| `db_bridge` | `db` | [ALICE-DB](../ALICE-DB) | Time-series DB query to plot data for GPU overlay |
+| `analytics_bridge` | `analytics` | [ALICE-Analytics](https://github.com/ext-sakamoro/ALICE-Analytics) | Real-time rendering performance analytics |
+| `physics_bridge` | `physics` | [ALICE-Physics](https://github.com/ext-sakamoro/ALICE-Physics) | Interactive physics debug overlay visualization |
+| `db_bridge` | `db` | [ALICE-DB](https://github.com/ext-sakamoro/ALICE-DB) | Time-series DB query to plot data for GPU overlay |
 
 ### Cargo Profile
 

@@ -16,7 +16,6 @@ on:
     branches: [main]
     paths:
       - 'Cargo.toml'
-      - '.github/make-stubs.py'
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
@@ -96,11 +95,6 @@ jobs:
         with:
           path: ALICE-View
 
-      # siblings at the commits pinned in .github/actions/siblings (one place)
-      - name: Fetch pinned sibling repositories
-        uses: ./ALICE-View/.github/actions/siblings
-        with:
-          repos: ALICE-SDF ALICE-LOL ALICE-Zip
 
       # cargo-fuzz は nightly toolchain 必須
       - name: Install nightly toolchain
@@ -110,10 +104,6 @@ jobs:
         with:
           workspaces: ALICE-View/fuzz
 
-      # stubs only for the siblings no build here compiles (versions and
-      # features derived from Cargo.toml; it fails loudly for a compiled one)
-      - name: Create dependency stubs
-        run: python3 ALICE-View/.github/make-stubs.py
 
       - name: Install Linux dependencies (for wgpu / winit build)
         run: |

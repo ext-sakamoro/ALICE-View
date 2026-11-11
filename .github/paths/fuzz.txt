@@ -2,7 +2,6 @@
 # on.pull_request.paths of the workflow, when present, must list the same patterns in the same order
 # (scripts/changed_paths.py sync)
 Cargo.toml
-.github/make-stubs.py
 src/**
 fuzz/**
 .github/workflows/fuzz.yml

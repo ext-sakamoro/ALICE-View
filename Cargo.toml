@@ -35,10 +35,10 @@ noise = "0.9"
 # path dep の `version` は publish に必須 (path だけだと `cargo package` が
 # "all dependencies must have a version requirement specified when packaging" で落ちる)
 # publish 時は `path` が外れて version 要求だけが残るので、値は相手の実 version に合わせる
-alice-sdf = { version = ">=6, <8", path = "../ALICE-SDF", default-features = false, features = ["gpu"] }
+alice-sdf = { version = ">=6, <8", git = "https://github.com/ext-sakamoro/ALICE-SDF", branch = "main", default-features = false, features = ["gpu"] }
 
 # ALICE-LOL Integration (LOL DSL runtime parser)
-alice-lol = { version = ">=0.4.1, <0.6", path = "../ALICE-LOL/alice-lol", optional = true }
+alice-lol = { version = ">=0.4.1, <0.6", git = "https://github.com/ext-sakamoro/ALICE-LOL", branch = "main", optional = true }
 
 # Logging
 log = "0.4"
@@ -59,9 +59,9 @@ chrono = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 
 # ALICE ecosystem bridges (optional)
-alice-analytics = { version = ">=0.6, <0.8", path = "../ALICE-Analytics", optional = true, default-features = false, features = ["std"] }
-alice-physics = { version = ">=3.0, <5", path = "../ALICE-Physics/crates/alice-physics", optional = true, default-features = false, features = ["std"] }
-alice-db = { version = "0.5", optional = true, default-features = false }
+alice-analytics = { version = ">=0.6, <0.8", git = "https://github.com/ext-sakamoro/ALICE-Analytics", branch = "main", optional = true, default-features = false, features = ["std"] }
+alice-physics = { version = ">=3.0, <5", git = "https://github.com/ext-sakamoro/ALICE-Physics", branch = "main", optional = true, default-features = false, features = ["std"] }
+alice-db = { version = "0.6", git = "https://github.com/ext-sakamoro/ALICE-DB", branch = "main", optional = true, default-features = false }
 
 [features]
 default = ["lol"]

@@ -22,17 +22,6 @@ jobs:
         with:
           path: ALICE-View
 
-      # siblings at the commits pinned in .github/actions/siblings (one place)
-      # - ALICE-Zip: alice-lol depends on alice-zip unconditionally (`research_law`),
-      #   so it is compiled by the default build and cannot be stubbed
-      # - ALICE-Analytics: real checkout rather than a stub: `analytics_bridge` names
-      #   types from this crate, so an empty stub fails to compile (and a stub that
-      #   compiles would be a test double with nothing in it); make-stubs.py skips
-      #   any sibling that is already present
-      - name: Fetch pinned sibling repositories
-        uses: ./ALICE-View/.github/actions/siblings
-        with:
-          repos: ALICE-SDF ALICE-LOL ALICE-Zip ALICE-Analytics
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -41,13 +30,6 @@ jobs:
         with:
           workspaces: ALICE-View
 
-      # stub の version / features は `Cargo.toml` から導出する (literal を書かない)
-      # workflow に literal を置くと source of truth が 2 つになり、path dep の
-      # version を動かした commit で CI が resolve 段階から落ちる 判定 (どの dep を
-      # stub にしてよいか) も script 側で機械的に出す 詳細は make-stubs.py の docstring
-      - name: Create dependency stubs
-        shell: bash
-        run: python3 ALICE-View/.github/make-stubs.py
 
       - name: Build (default)
         working-directory: ALICE-View
@@ -63,6 +45,12 @@ jobs:
       - name: Check the analytics bridge (optional feature)
         working-directory: ALICE-View
         run: cargo check --lib --features analytics
+
+      # every optional bridge (lol, analytics, physics, db) against the real crate: the ALICE crates are git
+      # dependencies (branch main), so nothing is stubbed and nothing is checked out next to this repository
+      - name: Test (all features)
+        working-directory: ALICE-View
+        run: cargo test --lib --all-features
 
   fmt:
     name: Format
@@ -188,18 +176,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # siblings come only from .github/actions/siblings (pinned commits); the
-      # self-test first shows the check catches each kind of violation
-      - name: Sibling pin check (self-test, then the workflows)
-        run: |
-          python3 .github/test_check_sibling_pins.py
-          python3 .github/check_sibling_pins.py
-      # release.yml runs make-stubs.py on Windows, whose default stdout encoding is
-      # cp1252; its output has non-ASCII text, so run it once with that encoding
-      - name: make-stubs.py under a cp1252 stdout (as on Windows)
-        env:
-          PYTHONIOENCODING: cp1252
-        run: python3 .github/make-stubs.py --allow-stub-all
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
         with:

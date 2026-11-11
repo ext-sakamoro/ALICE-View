@@ -228,5 +228,29 @@ class Relax(unittest.TestCase):
         self.assertIn('path = "../ALICE-DB"', self.toml.read_text())
 
 
+class RelaxWithoutSiblings(unittest.TestCase):
+    def test_a_path_dep_whose_sibling_is_absent_loses_its_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d) / "base"
+            base.mkdir()
+            toml = base / "Cargo.toml"
+            toml.write_text(
+                '[dependencies]\n'
+                'alice-sdf = { version = ">=6, <8", path = "../ALICE-SDF", default-features = false }\n'
+                'alice-lol = { version = ">=0.4.1, <0.6", git = "https://example.invalid/ALICE-LOL", branch = "main" }\n')
+            notes = g.relax_baseline(base)
+            text = toml.read_text()
+            self.assertEqual(len(notes), 1, notes)
+            self.assertIn("no sibling checkout", notes[0])
+            self.assertIn('alice-sdf = { version = ">=6, <8", default-features = false }', text)
+            self.assertIn('git = "https://example.invalid/ALICE-LOL"', text)
+
+    def test_ranges_and_carets_are_read(self):
+        self.assertTrue(g.satisfies("0.5.0", ">=0.4.1, <0.6"))
+        self.assertFalse(g.satisfies("0.6.0", ">=0.4.1, <0.6"))
+        self.assertTrue(g.satisfies("0.4.7", "0.4"))
+        self.assertFalse(g.satisfies("0.5.0", "0.4"))
+
+
 if __name__ == "__main__":
     unittest.main()

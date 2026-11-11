@@ -40,22 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # the same siblings as ci.yml's test job, at the commits pinned in
-      # .github/actions/siblings (this repo is at the workspace root, so they go
-      # next to it); a sibling that cannot be fetched fails the build
-      - name: Fetch pinned sibling repositories
-        uses: ./.github/actions/siblings
-        with:
-          repos: ALICE-SDF ALICE-LOL ALICE-Zip ALICE-Analytics
-          into: ..
 
-      # the optional sibling path deps that the default build does not compile
-      # get manifest stubs (versions / features derived from Cargo.toml)
-      - name: Create dependency stubs
-        shell: bash
-        run: |
-          py=$(command -v python3 || command -v python)
-          "$py" .github/make-stubs.py
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
