@@ -109,10 +109,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-
-      # EmbarkStudios/cargo-deny-action@v2 は Docker container 内で稼働し、
-      # /github/workspace のみ mount するため sibling path dep が見えず fail する
-      # 直接 install で回避 (action 版は advisory-db の取得で失敗する事例がある)
+      # cargo-deny は直接 install する (action 版は advisory-db の取得で失敗する事例がある)
       - name: Install cargo-deny
         run: cargo install --locked cargo-deny
 
@@ -186,9 +183,6 @@ jobs:
     name: Coverage (cargo-llvm-cov、informational)
     runs-on: ubuntu-latest
     # The coverage figure is informational; a build or test failure is not.
-    # This job used to run with `continue-on-error: true` on stubs of the
-    # siblings the lib compiles, and failed to compile (E0432 on alice_sdf)
-    # while reporting success.
     steps:
       - uses: actions/checkout@v5
         with:
@@ -236,10 +230,8 @@ jobs:
     # so a change whose version bump is lower than its lints need fails
     # (check-release compares the two Cargo.toml versions with the lint level
     # itself); a run that compared nothing fails too, except across a major bump,
-    # where the tool runs no checks. It used to run with `|| true` and
-    # `continue-on-error: true` and checked nothing: the latest
-    # cargo-semver-checks needs rustc >= 1.93 and rust-toolchain.toml pins
-    # 1.92.0, and the lib was built on stubs of the siblings it compiles.
+    # where the tool runs no checks. The version is pinned: the latest
+    # cargo-semver-checks needs rustc >= 1.93 and rust-toolchain.toml pins 1.92.0.
     steps:
       - uses: actions/checkout@v5
         with:
@@ -278,8 +270,8 @@ jobs:
           base=$(python3 .github/semver_gate.py baseline "$EVENT" "${BEFORE:-}" "$BASE_REF" 2>baseline-reason.txt)
           cat baseline-reason.txt
           git worktree add --detach ../ALICE-View-baseline "$base"
-          # a sibling that moved past a requirement of the baseline (alice-db "0.4" against
-          # a sibling at 0.5.0) is resolved from the registry for the baseline only
+          # a path dependency of the baseline (from before the ALICE crates were git dependencies)
+          # has no sibling checkout: it is resolved from the registry at the baseline's requirement
           python3 .github/semver_gate.py relax ../ALICE-View-baseline | tee -a baseline-reason.txt
           set +e
           cargo semver-checks check-release --package alice-view --baseline-root ../ALICE-View-baseline 2>&1 | tee semver.log

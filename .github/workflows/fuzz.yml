@@ -79,10 +79,8 @@ jobs:
     if: needs.changes.outputs.run == 'true'
     name: Fuzz — ${{ matrix.target }}
     runs-on: ubuntu-latest
-    # A crash or a build failure fails this job. It used to run with
-    # `continue-on-error: true`, and every target had been failing to compile
-    # (E0432 on alice_sdf: the lib was built on an empty stub of a sibling it
-    # compiles) while the run reported success.
+    # A crash or a build failure fails this job. The ALICE crates are git dependencies (branch main), so the
+    # fuzz targets build against the real crates (nothing is stubbed)
     strategy:
       fail-fast: false
       matrix:
