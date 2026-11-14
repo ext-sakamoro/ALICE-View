@@ -261,7 +261,10 @@ def _align_git_requirements(toml: Path, current: Path) -> list[str]:
     what it was when the baseline was written: once the other repository moves past the baseline's
     requirement (alice-db "0.6" against a main at 0.7.2) the baseline no longer resolves at all.
     The change under test moves the requirement too, so the baseline is built against the change's
-    requirement: the comparison is of this crate's API, with the same dependency on both sides."""
+    requirement: the comparison is of this crate's API, with the same dependency on both sides.
+    Limit: a dependency whose types this crate re-exports in its public API is then the same on both
+    sides, so a breaking bump of that dependency does not show as a break here (pinning the other
+    repository's revision as of the baseline commit's date would keep it)."""
     want = _git_requirements(current.read_text(encoding="utf-8"))
     out, changed = [], []
     for line in toml.read_text(encoding="utf-8").splitlines(keepends=True):
