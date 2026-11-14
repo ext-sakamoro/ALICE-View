@@ -61,7 +61,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 # ALICE ecosystem bridges (optional)
 alice-analytics = { version = ">=0.6, <0.8", git = "https://github.com/ext-sakamoro/ALICE-Analytics", branch = "main", optional = true, default-features = false, features = ["std"] }
 alice-physics = { version = ">=3.0, <5", git = "https://github.com/ext-sakamoro/ALICE-Physics", branch = "main", optional = true, default-features = false, features = ["std"] }
-alice-db = { version = "0.6", git = "https://github.com/ext-sakamoro/ALICE-DB", branch = "main", optional = true, default-features = false }
+alice-db = { version = "0.7", git = "https://github.com/ext-sakamoro/ALICE-DB", branch = "main", optional = true, default-features = false }
 
 [features]
 default = ["lol"]
