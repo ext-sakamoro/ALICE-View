@@ -42,7 +42,9 @@ only turn a correct red into green:
 
     semver_gate.py baseline <event> <before-sha> <base-ref>   prints the baseline commit
     semver_gate.py decide <log> <exit-code>
-    semver_gate.py relax <baseline-dir>   drops `path` from path dependencies the sibling no longer satisfies
+    semver_gate.py relax <baseline-dir>   drops `path` from path dependencies the sibling no longer satisfies,
+                                          and gives a git dependency the requirement the change has
+                                          (read from ./Cargo.toml) when the two differ
 """
 
 from __future__ import annotations
@@ -204,7 +206,7 @@ PATH_DEP_RE = re.compile(r'^(\s*[A-Za-z0-9_-]+\s*=\s*\{[^}\n]*?)\bpath\s*=\s*"([
 VERSION_RE = re.compile(r'\bversion\s*=\s*"([^"]+)"')
 
 
-def relax_baseline(base_dir: Path) -> list[str]:
+def relax_baseline(base_dir: Path, current: Path | None = None) -> list[str]:
     """Make the baseline resolve from what its own Cargo.toml requires.
 
     The baseline is an older commit, from when the ALICE crates were path dependencies on sibling
@@ -235,12 +237,49 @@ def relax_baseline(base_dir: Path) -> list[str]:
                 changed.append(f"{name} {v.group(1)}: {reason}, resolved from the registry")
         out.append(line)
     toml.write_text("".join(out), encoding="utf-8")
+    if current is not None:
+        changed += _align_git_requirements(toml, current)
+    return changed
+
+
+GIT_DEP_RE = re.compile(r'^\s*([A-Za-z0-9_-]+)\s*=\s*\{[^}\n]*\bgit\s*=\s*"[^"]+"[^}\n]*\}')
+
+
+def _git_requirements(text: str) -> dict[str, str]:
+    """The version requirement of each git dependency written on one line"""
+    out = {}
+    for line in text.splitlines():
+        m = GIT_DEP_RE.match(line)
+        v = VERSION_RE.search(line) if m else None
+        if m and v:
+            out[m.group(1)] = v.group(1)
+    return out
+
+
+def _align_git_requirements(toml: Path, current: Path) -> list[str]:
+    """A git dependency on a branch (`branch = "main"`) resolves to that branch's head now, not to
+    what it was when the baseline was written: once the other repository moves past the baseline's
+    requirement (alice-db "0.6" against a main at 0.7.2) the baseline no longer resolves at all.
+    The change under test moves the requirement too, so the baseline is built against the change's
+    requirement: the comparison is of this crate's API, with the same dependency on both sides."""
+    want = _git_requirements(current.read_text(encoding="utf-8"))
+    out, changed = [], []
+    for line in toml.read_text(encoding="utf-8").splitlines(keepends=True):
+        m = GIT_DEP_RE.match(line)
+        v = VERSION_RE.search(line) if m else None
+        if m and v and m.group(1) in want and want[m.group(1)] != v.group(1):
+            new = want[m.group(1)]
+            line = line[: v.start(1)] + new + line[v.end(1):]
+            changed.append(f"{m.group(1)} {v.group(1)}: git dependency, built with the change's requirement {new}")
+        out.append(line)
+    toml.write_text("".join(out), encoding="utf-8")
     return changed
 
 
 def main(argv: list[str]) -> int:
     if len(argv) == 2 and argv[0] == "relax":
-        for note in relax_baseline(Path(argv[1])):
+        current = Path("Cargo.toml")
+        for note in relax_baseline(Path(argv[1]), current if current.is_file() else None):
             print(f"semver baseline: {note}")
         return 0
     if len(argv) == 4 and argv[0] == "baseline":

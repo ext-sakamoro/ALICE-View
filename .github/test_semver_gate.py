@@ -245,6 +245,37 @@ class RelaxWithoutSiblings(unittest.TestCase):
             self.assertIn('alice-sdf = { version = ">=6, <8", default-features = false }', text)
             self.assertIn('git = "https://example.invalid/ALICE-LOL"', text)
 
+    def test_a_git_dep_gets_the_requirement_the_change_has(self):
+        # the baseline asked for alice-db "0.6" on a branch whose head is now 0.7: it would not resolve
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d) / "base"
+            base.mkdir()
+            toml = base / "Cargo.toml"
+            toml.write_text(
+                '[dependencies]\n'
+                'alice-db = { version = "0.6", git = "https://example.invalid/ALICE-DB", branch = "main", optional = true }\n'
+                'alice-lol = { version = ">=0.4.1, <0.6", git = "https://example.invalid/ALICE-LOL", branch = "main" }\n'
+                'alice-sdf = { version = ">=6, <8", path = "../ALICE-SDF" }\n')
+            current = Path(d) / "Cargo.toml"
+            current.write_text(
+                '[dependencies]\n'
+                'alice-db = { version = "0.7", git = "https://example.invalid/ALICE-DB", branch = "main", optional = true }\n'
+                'alice-lol = { version = ">=0.4.1, <0.6", git = "https://example.invalid/ALICE-LOL", branch = "main" }\n'
+                'alice-sdf = { version = ">=6, <8", git = "https://example.invalid/ALICE-SDF", branch = "main" }\n')
+            notes = g.relax_baseline(base, current)
+            text = toml.read_text()
+            git_notes = [n for n in notes if "git dependency" in n]
+            self.assertEqual(len(git_notes), 1, notes)
+            self.assertIn("alice-db 0.6", git_notes[0])
+            self.assertIn('alice-db = { version = "0.7", git = "https://example.invalid/ALICE-DB", branch = "main", optional = true }', text)
+            self.assertIn('alice-lol = { version = ">=0.4.1, <0.6", git', text)
+            # the path dependency is handled by the path rule (no sibling), not given the change's line
+            self.assertIn('alice-sdf = { version = ">=6, <8" }', text)
+            # without the change's manifest nothing is aligned
+            toml.write_text('[dependencies]\nalice-db = { version = "0.6", git = "https://example.invalid/ALICE-DB", branch = "main" }\n')
+            self.assertEqual(g.relax_baseline(base), [])
+            self.assertIn('version = "0.6"', toml.read_text())
+
     def test_ranges_and_carets_are_read(self):
         self.assertTrue(g.satisfies("0.5.0", ">=0.4.1, <0.6"))
         self.assertFalse(g.satisfies("0.6.0", ">=0.4.1, <0.6"))
