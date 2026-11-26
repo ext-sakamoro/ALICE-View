@@ -109,7 +109,7 @@ jobs:
           sudo apt-get install -y libxkbcommon-dev libwayland-dev
 
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        run: cargo +1.92.0 install cargo-fuzz --version 0.13.2 --locked
 
       - name: Set fuzz duration
         id: dur
