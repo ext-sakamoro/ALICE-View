@@ -9,6 +9,7 @@ All notable changes to ALICE-View are documented here.
 
 ### Changed
 - 依存: screenshot の file 名の時刻を chrono から ALICE-Ephemeris (main f3b48208、os-local feature で OS の time zone の offset) に替え、chrono を外した (cargo-deny の RUSTSEC-2026-0543 = chrono の保守終了、deny.toml の ignore は足さない) file 名は替える前と同じ `alice-view_YYYYMMDD_HHMMSS.png` (local の時刻、OS が offset を返さない時は UTC)
+- screenshot の file 名にできない時刻 (`Timestamp` の範囲外、local の年が 0..=9999 の外) は panic せず `capture_screenshot` が error (`ScreenshotTimeOutOfRange`) を返す
 - 依存: alice-db (`db` feature) を 0.7 に (要求 "0.7") alice-db 0.7 は alice-zip 0.12 を引く
 - alice-sdf / alice-lol / alice-analytics / alice-physics を path から git の branch main に、alice-db を crates.io の 0.5 から git の branch main の 0.6 に移した 解決は alice-* が全部 git、alice-det-math は 1 つ CI (ci / fuzz / release / security-audit) は隣の checkout と stub をやめ、ci は全 feature の test を足した (全 feature 148 件) `.github/actions/siblings` / `.github/actions/alice-stubs` / `make-stubs.py` / `check_sibling_pins.py` を消した semver の比較先が path 依存の頃の commit なら、sibling の無い path 依存は registry の要求どおりに解決する (`semver_gate.py relax`、試験 2 件を追加)
 - Licence: `MIT` → `LicenseRef-Proprietary`

@@ -272,7 +272,7 @@ impl Renderer {
             now,
         )
         .unwrap_or(0);
-        let timestamp = screenshot_file_name(now.unix_seconds(), offset);
+        let timestamp = screenshot_file_name(now.unix_seconds(), offset)?;
         let filename = format!("alice-view_{timestamp}.png");
 
         // Try Desktop, then current dir
@@ -439,27 +439,64 @@ impl Renderer {
     }
 }
 
+/// A screenshot time that has no `YYYYMMDD_HHMMSS` name: outside the `Timestamp` range, or a
+/// local year outside 0..=9999
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScreenshotTimeOutOfRange {
+    /// Seconds since 1970-01-01T00:00:00Z
+    pub unix_secs: i64,
+    /// The UTC offset (seconds east) the name was asked for
+    pub offset_secs: i32,
+}
+
+impl std::fmt::Display for ScreenshotTimeOutOfRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "screenshot time {} s at offset {} s has no YYYYMMDD_HHMMSS name",
+            self.unix_secs, self.offset_secs
+        )
+    }
+}
+
+impl std::error::Error for ScreenshotTimeOutOfRange {}
+
 /// The local wall-clock time of the instant `unix_secs` at the UTC offset `offset_secs` (seconds
 /// east) as `YYYYMMDD_HHMMSS`, the time stamp of a screenshot file name. An offset of a day or more
 /// is not a time zone offset and is read as UTC.
-fn screenshot_file_name(unix_secs: i64, offset_secs: i32) -> String {
+///
+/// # Errors
+///
+/// [`ScreenshotTimeOutOfRange`] when the time is outside the `Timestamp` range or its local year is
+/// outside 0..=9999.
+fn screenshot_file_name(
+    unix_secs: i64,
+    offset_secs: i32,
+) -> Result<String, ScreenshotTimeOutOfRange> {
     let offset = if offset_secs.unsigned_abs() >= 86_400 {
         0
     } else {
         offset_secs
     };
+    let out = ScreenshotTimeOutOfRange {
+        unix_secs,
+        offset_secs,
+    };
     // the instant moved by the offset, written in UTC, is the local wall-clock time
     let local = alice_ephemeris::time::Timestamp::from_unix(unix_secs, 0)
         .and_then(|t| t.checked_plus_seconds(i64::from(offset)))
-        .expect("a screenshot time is in the Timestamp range");
-    // `YYYYMMDDTHHMMSSZ` (years 0..=9999)
+        .ok_or(out)?;
+    // `YYYYMMDDTHHMMSSZ` only for years 0..=9999 (other years carry a sign and more digits)
     let compact = local.compact().to_string();
-    format!("{}_{}", &compact[0..8], &compact[9..15])
+    match (compact.get(0..8), compact.get(8..9), compact.get(9..15)) {
+        (Some(day), Some("T"), Some(time)) if compact.len() == 16 => Ok(format!("{day}_{time}")),
+        _ => Err(out),
+    }
 }
 
 #[cfg(test)]
 mod screenshot_name_tests {
-    use super::screenshot_file_name;
+    use super::{screenshot_file_name, ScreenshotTimeOutOfRange};
 
     // oracle: Python's datetime.fromtimestamp(s, timezone(timedelta(seconds=o))).strftime("%Y%m%d_%H%M%S"),
     // computed outside this crate (an offset of a day or more read as UTC)
@@ -478,10 +515,38 @@ mod screenshot_name_tests {
             (1_795_665_600, -86_400, "20261126_040000"),
         ] {
             assert_eq!(
-                screenshot_file_name(secs, offset),
-                want,
+                screenshot_file_name(secs, offset).as_deref(),
+                Ok(want),
                 "{secs} at {offset}"
             );
         }
+    }
+
+    #[test]
+    fn times_with_no_name_are_errors() {
+        for (secs, offset) in [
+            // 10000-01-01T00:00:00Z and the last second of year -1: a year a name cannot carry
+            (253_402_300_800, 0),
+            (253_402_300_799, 1),
+            (-62_167_219_201, 0),
+            // outside the Timestamp range, and an offset that steps out of it
+            (i64::MAX, 0),
+            (i64::MIN, 0),
+            (alice_ephemeris::time::Timestamp::MAX.unix_seconds(), 3600),
+        ] {
+            assert_eq!(
+                screenshot_file_name(secs, offset),
+                Err(ScreenshotTimeOutOfRange {
+                    unix_secs: secs,
+                    offset_secs: offset,
+                }),
+                "{secs} at {offset}"
+            );
+        }
+        // the first second of year 0 still has a name
+        assert_eq!(
+            screenshot_file_name(-62_167_219_200, 0).as_deref(),
+            Ok("00000101_000000")
+        );
     }
 }
