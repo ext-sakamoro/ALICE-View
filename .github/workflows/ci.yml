@@ -105,6 +105,9 @@ jobs:
           v=$(cargo metadata --format-version 1 | python3 -c "import json,sys; print(next(p['version'] for p in json.load(sys.stdin)['packages'] if p['name'] == 'wasm-bindgen'))")
           cargo install wasm-bindgen-cli --version "$v" --locked
 
+      - name: wasm-bindgen CLI version check (unit tests)
+        run: python3 probe/test_wasm_bindgen_match.py
+
       - name: Stall rule (unit tests)
         run: node --test probe/stall.test.mjs
 

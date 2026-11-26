@@ -14,7 +14,9 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+# exact: the wasm-bindgen CLI must be this version (probe/wasm_bindgen_match.py), so a new upstream release does not
+# change what a fresh checkout resolves
+wasm-bindgen = "=0.2.130"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = [
