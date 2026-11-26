@@ -53,7 +53,8 @@ rfd = "0.17"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 dirs = "5"
-chrono = "0.4"
+# the local wall-clock time of a screenshot file name (the OS time zone offset through the os-local feature)
+alice-ephemeris = { version = "0.1", git = "https://github.com/ext-sakamoro/ALICE-Ephemeris", branch = "main", features = ["os-local"] }
 
 # Async
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
