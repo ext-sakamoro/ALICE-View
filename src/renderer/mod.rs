@@ -265,8 +265,14 @@ impl Renderer {
         output.present();
 
         // Save to file
-        let now = chrono::Local::now();
-        let timestamp = screenshot_file_name(now.timestamp(), now.offset().local_minus_utc());
+        let now = alice_ephemeris::time::Timestamp::from_system_time(std::time::SystemTime::now());
+        // no offset from the OS (a time zone it cannot read) is read as UTC
+        let offset = alice_ephemeris::time::UtcOffsetAt::utc_offset_at(
+            &alice_ephemeris::time::OsLocalZone,
+            now,
+        )
+        .unwrap_or(0);
+        let timestamp = screenshot_file_name(now.unix_seconds(), offset);
         let filename = format!("alice-view_{timestamp}.png");
 
         // Try Desktop, then current dir
@@ -442,12 +448,13 @@ fn screenshot_file_name(unix_secs: i64, offset_secs: i32) -> String {
     } else {
         offset_secs
     };
-    let zone = chrono::FixedOffset::east_opt(offset).expect("an offset under a day is valid");
-    chrono::DateTime::from_timestamp(unix_secs, 0)
-        .expect("a screenshot time is in chrono's range")
-        .with_timezone(&zone)
-        .format("%Y%m%d_%H%M%S")
-        .to_string()
+    // the instant moved by the offset, written in UTC, is the local wall-clock time
+    let local = alice_ephemeris::time::Timestamp::from_unix(unix_secs, 0)
+        .and_then(|t| t.checked_plus_seconds(i64::from(offset)))
+        .expect("a screenshot time is in the Timestamp range");
+    // `YYYYMMDDTHHMMSSZ` (years 0..=9999)
+    let compact = local.compact().to_string();
+    format!("{}_{}", &compact[0..8], &compact[9..15])
 }
 
 #[cfg(test)]

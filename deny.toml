@@ -85,6 +85,15 @@ allow = ["AGPL-3.0-or-later"]
 name = "alice-physics"
 allow = ["LicenseRef-Proprietary"]
 
+# the screenshot time stamp (alice-ephemeris, its os-local member: same license)
+[[licenses.exceptions]]
+name = "alice-ephemeris"
+allow = ["LicenseRef-Proprietary"]
+
+[[licenses.exceptions]]
+name = "alice-ephemeris-os-local"
+allow = ["LicenseRef-Proprietary"]
+
 # alice-physics 4.0 is a facade over alice-physics-core (same license)
 [[licenses.exceptions]]
 name = "alice-physics-core"
