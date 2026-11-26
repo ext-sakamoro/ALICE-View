@@ -265,7 +265,8 @@ impl Renderer {
         output.present();
 
         // Save to file
-        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let now = chrono::Local::now();
+        let timestamp = screenshot_file_name(now.timestamp(), now.offset().local_minus_utc());
         let filename = format!("alice-view_{timestamp}.png");
 
         // Try Desktop, then current dir
@@ -429,5 +430,51 @@ impl Renderer {
         output.present();
 
         Ok(())
+    }
+}
+
+/// The local wall-clock time of the instant `unix_secs` at the UTC offset `offset_secs` (seconds
+/// east) as `YYYYMMDD_HHMMSS`, the time stamp of a screenshot file name. An offset of a day or more
+/// is not a time zone offset and is read as UTC.
+fn screenshot_file_name(unix_secs: i64, offset_secs: i32) -> String {
+    let offset = if offset_secs.unsigned_abs() >= 86_400 {
+        0
+    } else {
+        offset_secs
+    };
+    let zone = chrono::FixedOffset::east_opt(offset).expect("an offset under a day is valid");
+    chrono::DateTime::from_timestamp(unix_secs, 0)
+        .expect("a screenshot time is in chrono's range")
+        .with_timezone(&zone)
+        .format("%Y%m%d_%H%M%S")
+        .to_string()
+}
+
+#[cfg(test)]
+mod screenshot_name_tests {
+    use super::screenshot_file_name;
+
+    // oracle: Python's datetime.fromtimestamp(s, timezone(timedelta(seconds=o))).strftime("%Y%m%d_%H%M%S"),
+    // computed outside this crate (an offset of a day or more read as UTC)
+    #[test]
+    fn names_for_fixed_instants_and_offsets() {
+        for (secs, offset, want) in [
+            (0, 0, "19700101_000000"),
+            (1_795_665_600, 32_400, "20261126_130000"),
+            (1_795_665_600, -18_000, "20261125_230000"),
+            (1_764_115_199, 0, "20251125_235959"),
+            (1_764_115_199, 1, "20251126_000000"),
+            (951_782_399, 32_400, "20000229_085959"),
+            (-1, 0, "19691231_235959"),
+            (253_402_300_799, 0, "99991231_235959"),
+            (1_795_665_600, 86_400, "20261126_040000"),
+            (1_795_665_600, -86_400, "20261126_040000"),
+        ] {
+            assert_eq!(
+                screenshot_file_name(secs, offset),
+                want,
+                "{secs} at {offset}"
+            );
+        }
     }
 }
